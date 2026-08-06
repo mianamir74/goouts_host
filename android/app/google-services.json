@@ -1,0 +1,287 @@
+{
+  "project_info": {
+    "project_number": "289872853637",
+    "firebase_url": "https://goouts-f16db-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "goouts-f16db",
+    "storage_bucket": "goouts-f16db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289872853637:android:d68b6be59f594c755bc7ec",
+        "android_client_info": {
+          "package_name": "com.goouts.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "289872853637-3rs6veqhalq00hm7oc2iicstp9dnhnd3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.goouts.app",
+            "certificate_hash": "a24b4eb1a5b9e529d219fc816e4104f50815f293"
+          }
+        },
+        {
+          "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8x5e2Qbm5ccOHnSc4RJpLNQ57Bo3y0sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "289872853637-5dsdc5ksggagos9p3e4jmd68lkohn3lm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.goouts.terminal"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289872853637:android:a217b6211f5cf1a25bc7ec",
+        "android_client_info": {
+          "package_name": "com.goouts.driver"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "289872853637-nr3bj3c7o3ukd2qfp7972qfcio9r2d7a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.goouts.driver",
+            "certificate_hash": "a24b4eb1a5b9e529d219fc816e4104f50815f293"
+          }
+        },
+        {
+          "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8x5e2Qbm5ccOHnSc4RJpLNQ57Bo3y0sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "289872853637-5dsdc5ksggagos9p3e4jmd68lkohn3lm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.goouts.terminal"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289872853637:android:00607261d3b90f7b5bc7ec",
+        "android_client_info": {
+          "package_name": "com.goouts.driver_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "289872853637-ctqt5igdgb9lblvi4fum03k2ata3gaou.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.goouts.driver_app",
+            "certificate_hash": "a24b4eb1a5b9e529d219fc816e4104f50815f293"
+          }
+        },
+        {
+          "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8x5e2Qbm5ccOHnSc4RJpLNQ57Bo3y0sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "289872853637-5dsdc5ksggagos9p3e4jmd68lkohn3lm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.goouts.terminal"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289872853637:android:3a08b3c0ec88526b5bc7ec",
+        "android_client_info": {
+          "package_name": "com.goouts.host"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8x5e2Qbm5ccOHnSc4RJpLNQ57Bo3y0sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "289872853637-5dsdc5ksggagos9p3e4jmd68lkohn3lm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.goouts.terminal"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289872853637:android:1ec6cadf9d2ecb5a5bc7ec",
+        "android_client_info": {
+          "package_name": "com.goouts.lead"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8x5e2Qbm5ccOHnSc4RJpLNQ57Bo3y0sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "289872853637-5dsdc5ksggagos9p3e4jmd68lkohn3lm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.goouts.terminal"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289872853637:android:206bc3e8126988745bc7ec",
+        "android_client_info": {
+          "package_name": "com.goouts.partner"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8x5e2Qbm5ccOHnSc4RJpLNQ57Bo3y0sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "289872853637-5dsdc5ksggagos9p3e4jmd68lkohn3lm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.goouts.terminal"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289872853637:android:aa8b648631b7e1085bc7ec",
+        "android_client_info": {
+          "package_name": "com.goouts.terminal"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8x5e2Qbm5ccOHnSc4RJpLNQ57Bo3y0sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "289872853637-s29cqco49cs56g554tcghppj19f3ru96.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "289872853637-5dsdc5ksggagos9p3e4jmd68lkohn3lm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.goouts.terminal"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
