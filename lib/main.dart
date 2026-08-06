@@ -1,122 +1,113 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-void main() {
-  runApp(const MyApp());
+import 'features/auth/auth_flow_guard.dart';
+import 'features/auth/login_screen.dart';
+import 'firebase_options.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GoOuts Host. Bundle com.goouts.host on BOTH platforms.
+//
+// Created 6 August 2026. The auth folder is copied from driver_app, which is
+// the enrolment app — a host signs in exactly like a Business Partner does,
+// against the same /users records and the same phone OTP.
+// ─────────────────────────────────────────────────────────────────────────────
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Crash reports go to the same Firebase project as the other apps, but are
+  // OFF in debug so local experiments do not pollute the production crash
+  // list. driver_app's crash history is how its phone-auth bug was eventually
+  // found, and that only works if the noise stays out.
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  await FirebaseCrashlytics.instance
+      .setCrashlyticsCollectionEnabled(!kDebugMode);
+
+  runApp(const GoOutsHostApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class GoOutsHostApp extends StatelessWidget {
+  const GoOutsHostApp({super.key});
 
-  // This widget is the root of your application.
+  // Matches the palette in the Stitch host screens and STITCH_2_HOST.md.
+  static const Color _primary = Color(0xFF0392CA);
+  static const Color _navy = Color(0xFF0D1B3E);
+  static const Color _background = Color(0xFFF2F4F7);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'GoOuts Host',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _primary,
+          primary: _primary,
+        ),
+        scaffoldBackgroundColor: _background,
+        textTheme: GoogleFonts.interTextTheme(),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          foregroundColor: _navy,
+        ),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const _HostLaunchCoordinator(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+//  Decides what a host sees on launch.
+//
+//  ⚠ THE AuthFlowGuard CHECK IS NOT OPTIONAL. It exists because of a real bug
+//  in driver_app: authStateChanges() fires partway through phone verification,
+//  this StreamBuilder rebuilds, and the widget tree is replaced UNDER the OTP
+//  screen mid-flow. The user is thrown back to the start with no error and
+//  nothing in the logs.
+//
+//  LoginScreen calls AuthFlowGuard.start() before verification and .end()
+//  immediately before its final navigation. While the guard is active this
+//  must not rebuild.
+// ─────────────────────────────────────────────────────────────────────────────
+class _HostLaunchCoordinator extends StatelessWidget {
+  const _HostLaunchCoordinator();
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (AuthFlowGuard.isActive) {
+          // Mid-login. Hold what is on screen rather than rebuilding it away.
+          return const SizedBox.shrink();
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // TODO when the host screens move across from goouts_app: a signed-in
+        // host goes to HostRoutes.dashboard, and a host WITHOUT an approved
+        // /businesses record goes to KYC registration first. createStayListing
+        // refuses anyone unverified, so sending them straight to the listing
+        // wizard would let them fill in eight screens and fail at the last one.
+        //
+        // Until those screens are here, both paths land on login.
+        return const LoginScreen();
+      },
     );
   }
 }

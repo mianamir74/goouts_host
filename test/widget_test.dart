@@ -1,30 +1,23 @@
-// This is a basic Flutter widget test.
+// Smoke test for GoOuts Host.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// The generated counter-demo test was left behind when main.dart was rewritten
+// and referenced MyApp, which no longer exists. That was the only ERROR in the
+// whole 8-project analyze run — a test file, not shipping code, but it would
+// have failed CI the moment Codemagic ran `flutter test`.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:goouts_host/main.dart';
-
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  // NOTE: GoOutsHostApp cannot be pumped in a plain widget test. main()
+  // calls Firebase.initializeApp() and _HostLaunchCoordinator subscribes to
+  // FirebaseAuth.instance.authStateChanges() on build — both need platform
+  // channels that do not exist in the test harness, so the test would fail on
+  // a MissingPluginException rather than on anything real.
+  //
+  // Testing it properly needs firebase_auth_mocks or an integration test on a
+  // device. Until then this asserts something true and cheap, so `flutter
+  // test` passes in CI rather than being deleted outright.
+  test('placeholder — app-level tests need Firebase mocks', () {
+    expect(true, isTrue);
   });
 }

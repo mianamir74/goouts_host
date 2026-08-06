@@ -1,5 +1,5 @@
 name: goouts_host
-description: "A new Flutter project."
+description: "GoOuts Host — list your property."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -31,9 +31,38 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+
+  # ── Versions PINNED TO MATCH driver_app, deliberately ──────────────────────
+  #
+  # The auth folder was copied from driver_app wholesale. Letting pub resolve
+  # newer majors here would mean the same screens running against different
+  # SDK versions in two apps — and Firebase Auth in particular has had breaking
+  # changes between majors that surface as a runtime crash on a device rather
+  # than a compile error. This app has already spent a whole session chasing a
+  # phone-auth crash; matching versions removes one variable.
+  #
+  # If driver_app's versions move, move these with them.
+  firebase_core: ^4.11.0
+  firebase_auth: ^6.5.4
+  cloud_firestore: ^6.6.0
+  cloud_functions: ^6.3.3
+  firebase_storage: ^13.0.0
+  firebase_crashlytics: ^5.2.4
+
+  google_fonts: ^6.2.1
+  image_picker: ^1.2.1          # selfie capture for KYC
+  shared_preferences: ^2.5.5
+  go_router: ^17.1.0
+  auto_size_text: ^3.0.0
+  smooth_page_indicator: ^2.0.1
+  http: ^1.2.0                  # address_lookup_service — postcode autocomplete
+
+  # NOT copied from driver_app, and the omissions are deliberate:
+  #   firebase_messaging  — no push notifications wired yet
+  #   image               — on-device KYC scoring; add when the KYC screens
+  #                         actually score rather than just capture
+  #   intl, url_launcher, gallery_saver_plus — nothing imports them
 
 dev_dependencies:
   flutter_test:
@@ -57,10 +86,18 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # These three are referenced by the auth screens copied from driver_app.
+  #
+  # They were MISSING on the first analyze run — no assets/ folder and no
+  # declaration here. Nothing failed to compile, because every Image.asset call
+  # has an errorBuilder: the login, OTP and referral screens would simply have
+  # shown a grey placeholder icon where the GoOuts logo belongs, on a device,
+  # with nothing in the logs. Exactly the silent-failure shape this project
+  # keeps hitting.
+  assets:
+    - assets/logo/goouts_logo_white.png
+    - assets/logo/business_code.png
+    - assets/logo/role_icon.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
