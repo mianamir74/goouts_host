@@ -76,3 +76,6 @@ ios/Runner/GoogleService-Info.plist.bak
 # GoogleService-Info.plist ARE committed deliberately. Firebase
 # client config is compiled into the app binary and is not secret.
 # Codemagic needs them present to build.
+
+# marker written by PUSH_HOST.bat, not part of the project
+.gitignore.goouts
