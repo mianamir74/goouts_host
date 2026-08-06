@@ -2,23 +2,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../theme/goouts_colors.dart';
 import '../auth/login_screen.dart';
+import '../short_stay/host/host_routes.dart';
 
-/// Landing screen for a signed-in host.
+/// Landing screen for a signed-in host, shown before the dashboard.
 ///
-/// PLACEHOLDER. The real dashboard is one of the 25 Stitch screens currently
-/// sitting in goouts_app/lib/features/short_stay/host/ and will replace the
-/// body of this file when they move across.
+/// It exists as a separate screen from HostDashboardScreen for one reason:
+/// KYC state. createStayListing rejects any host whose /businesses record is
+/// not approved, so a host who cannot yet list needs to be told so HERE —
+/// not after filling in an eight-screen listing wizard.
 ///
-/// It is not a blank stub, though, because it has one job worth doing properly
-/// now: showing the host where their KYC stands. createStayListing rejects any
-/// host whose /businesses record is not approved, so a host who cannot yet
-/// list needs to be told that here rather than discovering it at the end of an
-/// eight-screen listing wizard.
+/// The Stitch dashboard has no concept of verification status, and giving it
+/// one means rebuilding it properly rather than editing placeholder copy. So
+/// this stays as the entry point until the dashboard is genuinely wired.
 class HostHomeScreen extends StatelessWidget {
   const HostHomeScreen({super.key});
-
-  static const Color _navy = Color(0xFF0D1B3E);
 
   @override
   Widget build(BuildContext context) {
@@ -80,25 +79,29 @@ class HostHomeScreen extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
-                        color: _navy,
+                        color: GoOutsColors.navy,
                       ),
                     ),
                     const SizedBox(height: 20),
                     _KycCard(approved: approved, status: kyc),
                     const SizedBox(height: 28),
-                    const Text(
-                      'Your dashboard is being built',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _navy,
-                      ),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.of(context)
+                          .pushNamed(HostRoutes.dashboard),
+                      icon: const Icon(Icons.dashboard_outlined),
+                      label: const Text('Open host dashboard'),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
+                    // Deliberately worded as a warning rather than a feature
+                    // list. The 25 screens behind this button render Stitch
+                    // placeholder copy — real-looking names, dates and money
+                    // that are not real. Anyone opening them should know that
+                    // before they read a number off one.
                     const Text(
-                      'Listings, bookings, your calendar and earnings will '
-                      'appear here.',
-                      style: TextStyle(fontSize: 14, color: Colors.black54),
+                      'The dashboard screens are still placeholders. Figures '
+                      'and bookings shown there are sample data, not your '
+                      'account.',
+                      style: TextStyle(fontSize: 13, color: Colors.black54),
                     ),
                   ],
                 );

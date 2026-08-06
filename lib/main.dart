@@ -7,7 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'features/auth/auth_flow_guard.dart';
 import 'features/auth/login_screen.dart';
+import 'features/short_stay/host/host_routes.dart';
 import 'firebase_options.dart';
+import 'theme/goouts_colors.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GoOuts Host. Bundle com.goouts.host on BOTH platforms.
@@ -38,10 +40,13 @@ Future<void> main() async {
 class GoOutsHostApp extends StatelessWidget {
   const GoOutsHostApp({super.key});
 
-  // Matches the palette in the Stitch host screens and STITCH_2_HOST.md.
-  static const Color _primary = Color(0xFF0392CA);
-  static const Color _navy = Color(0xFF0D1B3E);
-  static const Color _background = Color(0xFFF2F4F7);
+  // Colours come from theme/goouts_colors.dart, not from local constants.
+  //
+  // This used to declare its own _primary/_navy/_background, and _background
+  // was 0xFFF2F4F7 while 18 of the 25 host screens painted themselves
+  // 0xFFF8F9FF. Any screen that did not set its own Scaffold background got
+  // the app one, so the shade shifted depending on which screen you were on.
+  // Reading from the shared file makes that impossible rather than unlikely.
 
   @override
   Widget build(BuildContext context) {
@@ -51,18 +56,52 @@ class GoOutsHostApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: _primary,
-          primary: _primary,
+          seedColor: GoOutsColors.primary,
+          primary: GoOutsColors.primary,
         ),
-        scaffoldBackgroundColor: _background,
+        scaffoldBackgroundColor: GoOutsColors.background,
         textTheme: GoogleFonts.interTextTheme(),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
+          backgroundColor: GoOutsColors.surface,
           elevation: 0.5,
-          foregroundColor: _navy,
+          foregroundColor: GoOutsColors.navy,
         ),
       ),
       home: const _HostLaunchCoordinator(),
+
+      // The 25 host screens. One line rather than 25 entries, because
+      // HostRoutes owns its own names and parses its own arguments — adding a
+      // screen means touching host_routes.dart only, never this file.
+      //
+      // ⚠ THESE SCREENS ARE REACHABLE, NOT FUNCTIONAL. They came from Stitch
+      // on 4 August 2026: every handler is empty and every figure on screen is
+      // placeholder copy. Routing them makes them openable. It does not make
+      // them work, and the two are very easy to confuse when a screen looks
+      // finished.
+      onGenerateRoute: HostRoutes.onGenerateRoute,
+
+      // REQUIRED HERE, unlike in goouts_app.
+      //
+      // HostRoutes.onGenerateRoute returns NULL for a name it does not own.
+      // In the consumer app that was correct — the null fell through to a
+      // `routes:` map with 60 more entries. This app has no such map, so a
+      // null return would reach Flutter with nowhere to go and throw. A typo
+      // in a route name would become a crash rather than a visible mistake.
+      onUnknownRoute: (settings) => MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          appBar: AppBar(title: const Text('Page not found')),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'No screen is registered for "${settings.name}".',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: GoOutsColors.body),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

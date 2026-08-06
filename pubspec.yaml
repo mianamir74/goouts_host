@@ -57,12 +57,13 @@ dependencies:
   auto_size_text: ^3.0.0
   smooth_page_indicator: ^2.0.1
   http: ^1.2.0                  # address_lookup_service — postcode autocomplete
+  intl: ^0.20.2                 # short_stay/models/money.dart — currency format
 
   # NOT copied from driver_app, and the omissions are deliberate:
   #   firebase_messaging  — no push notifications wired yet
   #   image               — on-device KYC scoring; add when the KYC screens
   #                         actually score rather than just capture
-  #   intl, url_launcher, gallery_saver_plus — nothing imports them
+  #   url_launcher, gallery_saver_plus — nothing imports them
 
 dev_dependencies:
   flutter_test:
