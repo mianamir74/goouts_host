@@ -1,0 +1,100 @@
+# GoOuts Host — iOS build and TestFlight upload.
+#
+# Modelled on driver_app/.github/workflows/ios-testflight.yml, which is the
+# workflow that actually works. Three things differ and all three matter:
+#
+#   1. The bundle id is com.goouts.host, not com.goouts.lead. fetch-signing-files
+#      creates a provisioning profile for whatever id it is given, so a copied
+#      id would sign this app with the wrong profile and fail at upload with a
+#      mismatch that reads like a certificate problem.
+#
+#   2. The build number starts at 1, not 500. driver_app is offset because it
+#      has 500-odd historical builds; GoOuts Host has none, and starting high
+#      would waste the range and make the numbers meaningless.
+#
+#   3. The artifact name, so a downloaded IPA is identifiable.
+#
+# NOTE ON "Install Codemagic CLI tools": that step stays despite GoOuts no
+# longer using Codemagic as a CI service. codemagic-cli-tools is a standalone
+# open-source package — `keychain`, `app-store-connect` and `xcode-project` are
+# its commands. It has nothing to do with the hosted Codemagic product and is
+# the same toolchain driver_app uses on GitHub Actions today.
+
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build-ios:
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    env:
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Codemagic CLI tools
+        run: pipx install codemagic-cli-tools
+
+      - name: Initialize keychain
+        run: keychain initialize
+
+      - name: Fetch iOS signing files (App Store)
+        run: |
+          app-store-connect fetch-signing-files com.goouts.host \
+            --platform IOS \
+            --type IOS_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create
+
+      - name: Add certificates to keychain
+        run: keychain add-certificates
+
+      - name: Apply provisioning profiles
+        run: xcode-project use-profiles
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # Analyze before spending 40 minutes on a build that cannot succeed.
+      # driver_app does not do this and has burned whole runs on a typo.
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Set build number
+        run: |
+          BUILD_NUM=$GITHUB_RUN_NUMBER
+          echo "iOS build number -> $BUILD_NUM"
+          cd ios && agvtool new-version -all "$BUILD_NUM"
+
+      - name: Build IPA
+        run: |
+          flutter build ipa \
+            --release \
+            --export-options-plist="$HOME/export_options.plist"
+
+      - name: Publish to TestFlight
+        run: |
+          app-store-connect publish \
+            --path build/ios/ipa/*.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoOuts-Host-ipa
+          path: build/ios/ipa/*.ipa
