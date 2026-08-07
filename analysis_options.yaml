@@ -9,6 +9,26 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+# ── EXCLUDE build/ ───────────────────────────────────────────────────────────
+#
+# Added 6 August 2026 after a CI failure with 645 errors, none of them in this
+# app's code.
+#
+# During an iOS build, Swift Package Manager checks third-party sources out
+# into build/ios/SourcePackages/. That includes the Firebase SDK's OWN unit
+# tests, which import package:mockito — a dev dependency of Firebase, not of
+# this app. The analyzer read them and reported every mockito symbol as
+# undefined.
+#
+# It never showed up locally because ANALYZE_ALL.bat runs before any iOS build
+# exists, so build/ is not there to be analyzed. The same code was "clean"
+# locally and 645 errors in CI, which is exactly the kind of environment
+# difference that wastes an afternoon.
+analyzer:
+  exclude:
+    - build/**
+    - ios/Pods/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

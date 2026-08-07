@@ -48,6 +48,27 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # ── ANALYZE FIRST, BEFORE ANY SIGNING OR BUILD STEP ────────────────────
+      #
+      # Order matters here and it is not cosmetic.
+      #
+      # This step used to sit AFTER `xcode-project use-profiles`, which makes
+      # Swift Package Manager check third-party sources out into
+      # build/ios/SourcePackages/. Those checkouts include the Firebase SDK's
+      # own unit tests, which import package:mockito — a dev dependency of
+      # Firebase, not of this app. `flutter analyze` read them and reported 645
+      # errors, none of them in code anyone here wrote.
+      #
+      # analysis_options.yaml now excludes build/** as well, so either fix
+      # alone would do. Both are kept: the exclude protects local runs, and
+      # running first means a genuine code error costs two minutes instead of
+      # twenty-five.
+      - name: Analyze
+        run: flutter analyze
+
       - name: Install Codemagic CLI tools
         run: pipx install codemagic-cli-tools
 
@@ -67,14 +88,6 @@ jobs:
 
       - name: Apply provisioning profiles
         run: xcode-project use-profiles
-
-      - name: Flutter pub get
-        run: flutter pub get
-
-      # Analyze before spending 40 minutes on a build that cannot succeed.
-      # driver_app does not do this and has burned whole runs on a typo.
-      - name: Analyze
-        run: flutter analyze
 
       - name: Set build number
         run: |
