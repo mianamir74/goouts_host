@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/gestures.dart'; // TapGestureRecognizer, for the legal links
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -67,6 +68,11 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     });
+
+    // Unawaited on purpose. The legal text has a hardcoded fallback, so the
+    // screen must never wait on a network round trip before someone can type
+    // their phone number.
+    _loadHostLegal();
   }
 
   @override
@@ -188,6 +194,174 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         );
       },
+    );
+  }
+
+  // ── LEGAL DOCUMENTS ─────────────────────────────────────────────────────────
+  //
+  // Same pattern as driver_app and the consumer app: the text is loaded from
+  // Firestore so a wording change does not need an App Store release, with a
+  // hardcoded fallback so the screen still works offline or before seeding.
+  //
+  // ONE DIFFERENCE, DELIBERATE. The other apps read
+  // content_pages/terms_conditions, which holds the DRIVER and CONSUMER terms.
+  // A host is agreeing to something different — commission, cancellation
+  // liability, property-letting warranties — so this reads
+  // platform_config/host_legal, which is what the admin panel's Host Legal
+  // Documents page writes. Pointing it at the shared document would have shown
+  // hosts a contract about food delivery.
+  String? _hostTermsFromDb;
+  String? _hostPrivacyFromDb;
+
+  Future<void> _loadHostLegal() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('platform_config')
+          .doc('host_legal')
+          .get();
+      final d = snap.data();
+      if (d == null || !mounted) return;
+      final terms = (d['terms'] ?? '').toString();
+      final privacy = (d['privacy'] ?? '').toString();
+      setState(() {
+        if (terms.trim().isNotEmpty) _hostTermsFromDb = terms;
+        if (privacy.trim().isNotEmpty) _hostPrivacyFromDb = privacy;
+      });
+    } catch (_) {
+      // Not fatal. The fallback text below is shown instead — a legal document
+      // that fails to load must never block someone from signing up.
+    }
+  }
+
+  static const String _fallbackTerms = '''
+GoOuts Host — Terms & Conditions
+
+PLACEHOLDER FOR TESTING. These terms will be replaced by professionally
+drafted terms before launch.
+
+1. About GoOuts Host
+GoOuts Host lets property owners and managers in the United Kingdom and
+Northern Ireland list short-stay accommodation to guests on the GoOuts
+platform. GoOuts is the platform, not the accommodation provider — the
+agreement to stay is between you and your guest.
+
+2. Who can host
+You must be 18 or over. You must be legally entitled to let the property,
+including any permission required from a mortgage lender, freeholder or
+insurer, and you must comply with any local limits on short-term letting.
+
+3. Verification
+Hosting requires identity and business verification before a listing can be
+published. Listings are reviewed by GoOuts before they become visible.
+
+4. Commission and cashback
+GoOuts charges commission on each confirmed booking, and a share of that
+commission funds the cashback guests earn at partner venues. Current rates
+are shown in the app before you list.
+
+5. Cancellations
+Each listing carries a cancellation policy you choose. It applies to your
+guests and to you.
+
+6. Your responsibilities
+You are responsible for the accuracy of your listing, for gas and fire
+safety, and for the condition of the property at check-in.
+
+Governed by the laws of England and Wales.
+''';
+
+  static const String _fallbackPrivacy = '''
+GoOuts Host — Privacy Policy
+
+PLACEHOLDER FOR TESTING. This policy will be replaced by a professionally
+drafted policy before launch.
+
+Who we are
+GoOuts Worldwide Ltd is the data controller for the personal data collected
+through GoOuts Host.
+
+What we collect
+Your name, date of birth and contact details. Your mobile number, used to
+sign you in. Identity documents and a selfie, used to verify who you are.
+Your property address and listing details. Payout details, handled by our
+payment provider.
+
+Why we collect it
+To verify that you are who you say you are and are entitled to let the
+property, to publish your listing, to process bookings, and to meet legal
+obligations including tax reporting.
+
+How long we keep it
+Verification records are kept for as long as you host with us and for six
+years afterwards, which is the period HMRC may require.
+
+Your rights
+Under UK GDPR you can ask for a copy of your data, ask us to correct it, or
+ask us to delete it where we are not required to keep it.
+
+Contact
+Write to us in the app under Help, or email the address shown on the GoOuts
+website.
+''';
+
+  void _showLegalSheet({required bool terms}) {
+    final String title =
+        terms ? 'Terms & Conditions' : 'Privacy Policy';
+    final String body = terms
+        ? (_hostTermsFromDb ?? _fallbackTerms)
+        : (_hostPrivacyFromDb ?? _fallbackPrivacy);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        height: MediaQuery.of(context).size.height * 0.82,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0D1B3E),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded,
+                        color: Colors.black54, size: 24),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  body,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    height: 1.55,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -725,6 +899,109 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Colors.black45,
                             ),
                           ),
+
+                          // ── LEGAL ──────────────────────────────────────────
+                          //
+                          // Same pattern as driver_app and the consumer app:
+                          // tappable text rather than a tick box, so the
+                          // wording is identical across the estate.
+                          //
+                          // Both documents are linked, not just terms. A host
+                          // hands over identity documents and a property
+                          // address, so the privacy policy is the one they are
+                          // more likely to want before typing anything.
+                          if (!_isReturningUser) ...<Widget>[
+                            const SizedBox(height: 18),
+                            Center(
+                              child: RichText(
+                                textAlign: TextAlign.center,
+                                text: TextSpan(
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: Colors.black54,
+                                    height: 1.5,
+                                  ),
+                                  children: <InlineSpan>[
+                                    const TextSpan(
+                                      text: 'By continuing, you agree to our ',
+                                    ),
+                                    TextSpan(
+                                      text: 'Terms & Conditions',
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () =>
+                                            _showLegalSheet(terms: true),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: _goOutsBlue,
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: _goOutsBlue,
+                                      ),
+                                    ),
+                                    const TextSpan(text: ' and '),
+                                    TextSpan(
+                                      text: 'Privacy Policy',
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () =>
+                                            _showLegalSheet(terms: false),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: _goOutsBlue,
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: _goOutsBlue,
+                                      ),
+                                    ),
+                                    const TextSpan(text: '.'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          // ── ALREADY HAVE AN ACCOUNT ────────────────────────
+                          //
+                          // In this app one screen does both jobs: the same
+                          // phone number and OTP either signs you in or starts
+                          // enrolment, depending on whether a /businesses
+                          // record exists. There is nothing to switch to.
+                          //
+                          // The line is still here because its ABSENCE is what
+                          // people notice — every other app has it, and without
+                          // it a returning host wonders whether they are about
+                          // to create a second account. It reassures rather
+                          // than navigates.
+                          if (!_isReturningUser) ...<Widget>[
+                            const SizedBox(height: 18),
+                            Center(
+                              child: RichText(
+                                textAlign: TextAlign.center,
+                                text: const TextSpan(
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.black54,
+                                  ),
+                                  children: <InlineSpan>[
+                                    TextSpan(text: 'Already have an account? '),
+                                    TextSpan(
+                                      text: 'Sign in',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: _goOutsBlue,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text:
+                                          '\nUse the same number — we will know it is you.',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: Colors.black38,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+
                           const SizedBox(height: 20),
                           Center(
                             child: GestureDetector(
