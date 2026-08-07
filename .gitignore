@@ -79,3 +79,14 @@ ios/Runner/GoogleService-Info.plist.bak
 
 # marker written by PUSH_HOST.bat, not part of the project
 .gitignore.goouts
+
+# App Store Connect API keys. Added 6 August 2026.
+#
+# The .gitignore already blocked *.p12, *.cer and *.mobileprovision but NOT
+# *.p8, which is the format App Store Connect issues. AuthKey_*.p8 grants API
+# access to the whole developer account and Apple lets you download it exactly
+# once — a leaked one has to be revoked and every CI secret reissued.
+*.p8
+AuthKey_*.p8
+cert_key
+cert_key.pub

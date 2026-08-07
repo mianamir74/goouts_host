@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Copied from driver_app, which is the app whose phone auth actually works.
+
+	  GoOuts Host does NOT use firebase_messaging and sends no notifications of
+	  its own. This is here anyway, and it is not optional:
+
+	  Firebase Phone Auth on iOS verifies the app by sending a SILENT push to
+	  it before the SMS is sent. Without the APNs entitlement that silent push
+	  cannot arrive, and Firebase falls back to a reCAPTCHA web view — or, if
+	  the URL scheme is also missing, fails outright.
+
+	  driver_app spent roughly twenty builds on exactly this.
+
+	  'production' rather than 'development' because TestFlight builds are
+	  signed with a distribution certificate and use the production APNs
+	  environment. A development value here makes the token invalid and the
+	  failure looks like a Firebase problem rather than a signing one.
+	-->
+	<key>aps-environment</key>
+	<string>production</string>
+</dict>
+</plist>

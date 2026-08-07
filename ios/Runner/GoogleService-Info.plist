@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  GoOuts Host — Firebase iOS configuration.
+
+  GENERATED 6 August 2026 from lib/firebase_options.dart rather than downloaded
+  from the Firebase Console. Every value below is copied from the ios block of
+  that file, which flutterfire wrote when the app was registered, so the two
+  cannot disagree — which is the usual way this file goes wrong.
+
+  REVERSED_CLIENT_ID is derived from CLIENT_ID by swapping the two halves:
+      289872853637-t9dd...apps.googleusercontent.com
+   -> com.googleusercontent.apps.289872853637-t9dd...
+  That transform was verified against driver_app's console-downloaded plist
+  before being applied here.
+
+  ── WHY THIS FILE MATTERS FOR AN APP WITH NO GOOGLE SIGN-IN ────────────────
+
+  Flutter reads firebase_options.dart, so Firebase initialises fine without
+  this file. What it is really here for is REVERSED_CLIENT_ID, which becomes
+  the custom URL scheme in Info.plist. Firebase Phone Auth on iOS falls back to
+  a reCAPTCHA web view whenever the silent APNs push does not arrive — on a
+  simulator, with notifications denied, or on a flaky network — and that web
+  view needs the scheme to hand control back to the app. Without it the OTP
+  screen simply never advances.
+
+  NOT SECRET. An iOS API key is compiled into every copy of the app and can be
+  read out of any IPA. Google says as much. Security comes from Firestore rules
+  and App Check, which is why this file is committed deliberately.
+-->
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>289872853637-t9dd60rkgm1dugr9vdqt2ubgslh0gi3l.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.289872853637-t9dd60rkgm1dugr9vdqt2ubgslh0gi3l</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>289872853637-3rs6veqhalq00hm7oc2iicstp9dnhnd3.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyD0u_n7kV2uPuSKFjaqYOyEiioDR5Y5d9o</string>
+	<key>GCM_SENDER_ID</key>
+	<string>289872853637</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.goouts.host</string>
+	<key>PROJECT_ID</key>
+	<string>goouts-f16db</string>
+	<key>STORAGE_BUCKET</key>
+	<string>goouts-f16db.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:289872853637:ios:472beb4e0b11c1625bc7ec</string>
+	<key>DATABASE_URL</key>
+	<string>https://goouts-f16db-default-rtdb.europe-west1.firebasedatabase.app</string>
+</dict>
+</plist>

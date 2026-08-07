@@ -47,6 +47,48 @@
 			</array>
 		</dict>
 	</dict>
+	<!--
+	  ADDED 6 August 2026. Required for Firebase Phone Auth, not for
+	  notifications — this app sends none of its own.
+
+	  Firebase verifies the app by sending a SILENT push before the SMS goes
+	  out. remote-notification is what allows iOS to wake the app to receive
+	  it. Without this the silent push is dropped, Firebase falls back to a
+	  reCAPTCHA web view, and if that also cannot complete the OTP never
+	  arrives — with nothing useful in the logs.
+
+	  driver_app lost roughly twenty builds to this exact omission.
+	-->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<!--
+	  The REVERSED_CLIENT_ID from GoogleService-Info.plist, registered as a
+	  custom URL scheme.
+
+	  This is the OTHER half of phone auth, and it is the half that is easy to
+	  miss because nothing about it mentions phone numbers. When the silent
+	  APNs push does not arrive — simulator, notifications denied, poor
+	  network — Firebase falls back to a reCAPTCHA web view. The web view
+	  finishes by opening this scheme to hand control back to the app. Without
+	  it the user completes the reCAPTCHA and then sits on a screen that never
+	  moves.
+
+	  Must match REVERSED_CLIENT_ID exactly. If Firebase ever reissues the iOS
+	  OAuth client, both change together.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.289872853637-t9dd60rkgm1dugr9vdqt2ubgslh0gi3l</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
