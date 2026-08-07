@@ -31,6 +31,31 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>GoOuts Host uses Face ID to keep your host account secure.</string>
 
+	<!--
+	  ── EXPORT COMPLIANCE, DECLARED ONCE INSTEAD OF EVERY BUILD ─────────────
+
+	  ADDED 7 August 2026. Build 4 and build 5 both stalled in TestFlight at
+	  "Missing Compliance" because this is asked PER BUILD, not per app. Left
+	  unset, someone has to open App Store Connect and answer the same question
+	  before every single release — and a build nobody answers for simply never
+	  reaches a tester, with no notification that anything is wrong.
+
+	  Apple's own dialog points at this key as the way to bypass it.
+
+	  false = the app uses only the encryption built into iOS. GoOuts Host
+	  talks to Firebase over HTTPS/TLS and implements no cryptography of its
+	  own: no custom algorithms, no bundled crypto library. That is the
+	  exemption in US EAR 740.17(b), and it is the same answer Mian selected
+	  by hand for build 4 ("None of the algorithms mentioned above") — this
+	  records that decision rather than making a new one.
+
+	  ⚠ If the app ever ships its own encryption — an encrypted local database,
+	  a custom protocol, bundled OpenSSL — this must be revisited. It is a
+	  declaration to a US export regime, not a build setting.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

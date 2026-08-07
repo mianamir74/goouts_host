@@ -30,7 +30,12 @@ on:
 jobs:
   build-ios:
     runs-on: macos-26
-    timeout-minutes: 60
+    # 90, not 60. The job now WAITS for Apple to finish processing the build
+    # before attaching it to the beta group (see the Publish step). Build and
+    # upload alone take ~25 minutes; processing can add up to 30 more. At 60
+    # the job would be killed mid-wait and the build would go unattached —
+    # the exact failure this change exists to prevent.
+    timeout-minutes: 90
 
     env:
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -101,10 +106,45 @@ jobs:
             --release \
             --export-options-plist="$HOME/export_options.plist"
 
+      # ── ATTACH THE BUILD TO THE TESTER GROUP AUTOMATICALLY ─────────────────
+      #
+      # ADDED 7 August 2026, to remove a manual step that was being done by
+      # hand after every single build.
+      #
+      # Uploading a build and DISTRIBUTING a build are two separate things.
+      # `publish` on its own only does the first. The build lands in the
+      # TestFlight tab, processing completes, and then it sits there attached
+      # to no group — so there is nobody for Apple to notify. Nothing reports
+      # this as an error. Builds 4 and 5 each had to be attached by hand in
+      # the console afterwards, which is easy to forget and impossible to
+      # notice when forgotten.
+      #
+      # --beta-group does the attaching as part of the same command, once
+      # processing finishes. The name must match the group in App Store
+      # Connect EXACTLY, including capitals and spaces.
+      #
+      # ⚠ It must be "GoOuts Host Testers", NOT "GoOuts Internal". The latter
+      # was created with "Enable automatic distribution" ticked, which cannot
+      # be changed afterwards and which blocks anything from being added by
+      # any route. It holds build 4 and can never hold another.
+      #
+      # Note there is no --testflight flag. That one submits for Beta App
+      # Review, which is only needed for EXTERNAL testers and which locks the
+      # build's group controls while Apple looks at it. This group is
+      # internal, so the build is available the moment processing ends.
+      #
+      # No --whats-new either, deliberately. This step is being changed for
+      # the first time on a build that matters, so it changes by exactly ONE
+      # variable. Release notes are cosmetic; if they turned out to need
+      # --testflight to take effect, a failure here would be indistinguishable
+      # from --beta-group being wrong. Add them next build, once this is
+      # proven.
       - name: Publish to TestFlight
         run: |
           app-store-connect publish \
-            --path build/ios/ipa/*.ipa
+            --path build/ios/ipa/*.ipa \
+            --beta-group "GoOuts Host Testers" \
+            --max-build-processing-wait 30
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
