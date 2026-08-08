@@ -6,8 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'features/auth/auth_flow_guard.dart';
-import 'features/auth/login_screen.dart';
+import 'features/home/host_home_screen.dart';
 import 'features/short_stay/host/host_routes.dart';
+import 'features/splash/host_splash_screen.dart';
 import 'firebase_options.dart';
 import 'theme/goouts_colors.dart';
 
@@ -132,20 +133,37 @@ class _HostLaunchCoordinator extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
+        // Auth has not resolved. The splash rather than a bare spinner — a
+        // cold start on a poor connection can sit here for a second or two,
+        // and a blue screen with the brand on it is a better second than a
+        // grey one with a circle.
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const HostSplashScreen(mode: HostSplashMode.loading);
         }
 
-        // TODO when the host screens move across from goouts_app: a signed-in
-        // host goes to HostRoutes.dashboard, and a host WITHOUT an approved
-        // /businesses record goes to KYC registration first. createStayListing
-        // refuses anyone unverified, so sending them straight to the listing
-        // wizard would let them fill in eight screens and fail at the last one.
+        // ── SIGNED IN ────────────────────────────────────────────────────
         //
-        // Until those screens are here, both paths land on login.
-        return const LoginScreen();
+        // FIXED 8 August 2026. This used to return LoginScreen for EVERYONE,
+        // with a TODO admitting it: "Until those screens are here, both paths
+        // land on login." Those screens are here now.
+        //
+        // The old behaviour was not merely untidy. A returning host saw the
+        // login form appear, then get replaced a moment later once
+        // LoginScreen's own auth listener noticed they were already signed in
+        // and navigated away. Being shown a login form you do not need reads
+        // as "it has forgotten me".
+        //
+        // HostHomeScreen, not the dashboard, and deliberately: it is the
+        // screen that reads /stay_hosts and tells a host whether they are
+        // verified. createStayListing refuses anyone unverified, so a host
+        // dropped straight into the listing wizard would fill in seven screens
+        // and be refused at the last one.
+        if (snapshot.data != null) {
+          return const HostHomeScreen();
+        }
+
+        // Nobody signed in. Same splash, now with the ways in.
+        return const HostSplashScreen(mode: HostSplashMode.welcome);
       },
     );
   }

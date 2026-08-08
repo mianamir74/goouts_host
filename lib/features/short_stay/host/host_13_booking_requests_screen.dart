@@ -34,6 +34,7 @@ import 'package:google_fonts/google_fonts.dart';
 // money.dart is NOT imported. Pence arrives already typed on
 // HostBookingRequest, so the type is never named here.
 import '../services/stay_host_service.dart';
+import 'host_routes.dart';
 
 import '../../../theme/goouts_colors.dart';
 
@@ -486,6 +487,31 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+
+          // ── FULL DETAILS ──────────────────────────────────────────────
+          //
+          // Added 8 August 2026. Screen 15 was routed and reachable from
+          // nothing, so a host could accept or decline but never see the
+          // cancellation terms, the exact payout breakdown, or (once
+          // accepted) the route to photographing the rooms before arrival.
+          //
+          // PASS THE ID, NEVER THE OBJECT — a route argument holding a
+          // booking breaks deep links and state restoration after iOS kills
+          // the app.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).pushNamed(
+                  HostRoutes.booking,
+                  arguments: r.bookingId,
+                ),
+                icon: const Icon(Icons.receipt_long_outlined, size: 17),
+                label: const Text('See full details'),
+              ),
             ),
           ),
         ],

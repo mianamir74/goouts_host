@@ -52,6 +52,21 @@ dependencies:
 
   google_fonts: ^6.2.1
   image_picker: ^1.2.1          # selfie capture for KYC
+
+  # ── EVIDENCE CAPTURE. Versions MATCH goouts_app deliberately. ──────────────
+  #
+  # StayEvidenceService is ported from the consumer app and writes into the
+  # same collection, so both apps must resize and encode identically. Two
+  # different `image` majors would produce visibly different photographs on
+  # either side of the same dispute.
+  #
+  # image        compress before upload. NEVER hold more than one full
+  #              resolution photograph in memory — iOS has killed this app for
+  #              memory before, and a seven room capture wants seven of them.
+  # path_provider  somewhere to write the compressed temp file, which is then
+  #              uploaded FROM DISK and deleted.
+  image: ^4.1.7
+  path_provider: ^2.1.4
   shared_preferences: ^2.5.5
   go_router: ^17.1.0
   auto_size_text: ^3.0.0

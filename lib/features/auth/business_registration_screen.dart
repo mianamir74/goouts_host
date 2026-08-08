@@ -9,7 +9,10 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../home/host_home_screen.dart';
-import '../legal/terms_and_conditions_screen.dart';
+// terms_and_conditions_screen import removed 8 August 2026 with the tick box.
+// The only thing that used it here was _openTermsAndConditions, and the terms
+// are now shown from the sign-up screen instead — which reads them from
+// legal_documents/host_legal, a collection readable before sign-in.
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_host/features/common/goouts_sheet.dart';
 
@@ -113,8 +116,6 @@ class _BusinessRegistrationScreenState
 
   bool _obscurePin = true;
   bool _obscureConfirmPin = true;
-  bool _acceptedTerms = false;
-  bool _showTermsError = false;
   bool _isLoading = false;
   bool _isPickingSelfie = false;
   bool _showSelfieError = false;
@@ -248,30 +249,6 @@ class _BusinessRegistrationScreenState
   void _showSnackBarMessage(String message) {
     if (!mounted) return;
     GoOutsSheet.warning(context, title: 'Attention', message: message);
-  }
-
-  Future<void> _showTermsRequiredDialog() async {
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Required Confirmation'),
-          content: const Text(
-            'Please accept Terms & Conditions before continuing.',
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _openTermsAndConditions() async {
-    showTermsSheet(context);
   }
 
   Future<void> _pickSelfie() async {
@@ -599,7 +576,6 @@ class _BusinessRegistrationScreenState
   bool get _isRoadNameComplete => _roadNameController.text.trim().length >= 2;
   bool get _isCountryComplete => (_selectedCountry ?? '').trim().isNotEmpty;
   bool get _isCityComplete => (_selectedCity ?? '').trim().isNotEmpty;
-  bool get _isTermsComplete => _acceptedTerms;
   bool get _isSelfieComplete => _selfieImage != null;
 
   Widget _successIcon(bool show) {
@@ -644,14 +620,6 @@ class _BusinessRegistrationScreenState
         _showSelfieError = true;
       });
       _showSnackBarMessage('Please capture your selfie before continuing.');
-      return;
-    }
-
-    if (!_acceptedTerms) {
-      setState(() {
-        _showTermsError = true;
-      });
-      await _showTermsRequiredDialog();
       return;
     }
 
@@ -747,6 +715,53 @@ class _BusinessRegistrationScreenState
 
       if (_isPostcodeVerified) {
         businessData['postcodeVerifiedAt'] = FieldValue.serverTimestamp();
+      }
+
+      // ── DO NOT SEND ADMIN-OWNED FIELDS ON A RE-SUBMISSION ────────────────
+      //
+      // ADDED 8 August 2026.
+      //
+      // firestore.rules guards /stay_hosts updates with selfEditAllowed, which
+      // refuses ANY write touching driverProtectedFields() — a list that
+      // includes `status`. And it refuses the WHOLE write, not the offending
+      // field.
+      //
+      // First registration is a `create`, which has no field restrictions, so
+      // sending status: 'PENDING' there is fine and it is how the record gets
+      // its initial state.
+      //
+      // But a host who comes back to correct a typo AFTER you have approved
+      // them is doing an `update` that changes status from APPROVED back to
+      // PENDING. Firestore denies it, and every other correction they made in
+      // the same form dies with it — with an error that says permission denied
+      // and nothing about which field caused it.
+      //
+      // So: strip the admin-owned keys when the record already exists. The
+      // server and the admin panel own verification state; the host owns their
+      // details.
+      final existing = await FirebaseFirestore.instance
+          .collection(kStayHostsCollection)
+          .doc(currentUser.uid)
+          .get();
+
+      if (existing.exists) {
+        // Mirrors driverProtectedFields() in firestore.rules. If that list
+        // changes, this changes.
+        for (final k in const <String>[
+          'status',
+          'kycStatus',
+          'accountStatus',
+          'isActive',
+          'role',
+          'rating',
+          'verified',
+          'approved',
+          'walletBalance',
+          'adminManualVerification',
+          'overallResult',
+        ]) {
+          businessData.remove(k);
+        }
       }
 
       await FirebaseFirestore.instance
@@ -1638,54 +1653,19 @@ class _BusinessRegistrationScreenState
                   ],
                 ],
               ),
-              _buildSectionCard(
-                title: 'Terms & Conditions',
-                subtitle: 'You must accept the terms before continuing.',
-                children: <Widget>[
-                  CheckboxListTile(
-                    value: _acceptedTerms,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        _acceptedTerms = value ?? false;
-                        _showTermsError = false;
-                      });
-                    },
-                    title: Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: <Widget>[
-                        const Text('I accept the '),
-                        GestureDetector(
-                          onTap: _openTermsAndConditions,
-                          child: const Text(
-                            'Terms & Conditions',
-                            style: TextStyle(
-                              color: _goOutsBlue,
-                              fontWeight: FontWeight.w700,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _successIcon(_isTermsComplete),
-                      ],
-                    ),
-                  ),
-                  if (_showTermsError)
-                    Padding(
-                      padding: EdgeInsets.only(top: 6),
-                      child: Text(
-                        'You must accept Terms & Conditions.',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              // ── THE TERMS TICK BOX USED TO BE HERE ──────────────────────
+              //
+              // Moved to the sign-up screen on 8 August 2026. It was in the
+              // wrong place in the journey: by the time a host reached this
+              // card they had already given their phone number, received an
+              // SMS code, and filled in their name, address and company
+              // number. Consent asked at the end of a form is consent asked
+              // after the fact.
+              //
+              // It is now the last thing before the phone number is submitted,
+              // and Continue there is blocked until it is ticked. The
+              // 'termsAccepted' field written below still records it — the
+              // agreement happened, one screen earlier.
               SizedBox(height: 6),
               SizedBox(
                 height: 56,

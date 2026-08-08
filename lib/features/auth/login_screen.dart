@@ -45,6 +45,25 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isReturningUser = false;
   bool _obscurePassword = true;
 
+  // ── LEGAL ACCEPTANCE, ASKED BEFORE ANYTHING IS SENT ──────────────────────
+  //
+  // MOVED HERE 8 August 2026 from business_registration_screen, where the tick
+  // box sat near the bottom of a long form — AFTER the host had given their
+  // phone number, received an SMS code, and typed their name, address and
+  // company number.
+  //
+  // This screen previously carried only a passive "By continuing, you agree
+  // to our Terms" line. That is a weaker record of consent than a box someone
+  // deliberately ticked, and it was in the wrong place in the journey.
+  //
+  // Nothing leaves the device until this is true: _handleContinue refuses,
+  // so no phone number is submitted and no SMS is sent.
+  //
+  // Not shown to returning users. They agreed at signup, and asking again
+  // implies the terms changed when they have not.
+  bool _acceptedLegal = false;
+  bool _showLegalError = false;
+
   final _authService = AuthService();
 
   // Simple country picker state
@@ -207,20 +226,36 @@ class _LoginScreenState extends State<LoginScreen> {
   // Firestore so a wording change does not need an App Store release, with a
   // hardcoded fallback so the screen still works offline or before seeding.
   //
-  // ONE DIFFERENCE, DELIBERATE. The other apps read
-  // content_pages/terms_conditions, which holds the DRIVER and CONSUMER terms.
-  // A host is agreeing to something different — commission, cancellation
-  // liability, property-letting warranties — so this reads
-  // platform_config/host_legal, which is what the admin panel's Host Legal
-  // Documents page writes. Pointing it at the shared document would have shown
-  // hosts a contract about food delivery.
+  // A host is agreeing to something different from a driver or a consumer —
+  // commission, cancellation liability, property-letting warranties — so this
+  // reads its own document rather than the shared content_pages/terms.
+  //
+  // ⚠ MOVED 8 August 2026 from platform_config/host_legal.
+  //
+  // platform_config is `allow read, write: if isAdmin()`. Every read here was
+  // DENIED, and the catch below swallowed it — correctly, because a legal
+  // document that fails to load must never block someone signing up. The
+  // result was that the fallback text at the bottom of this file was the only
+  // thing any host ever saw, while the admin panel's Host Legal Documents page
+  // wrote to a document nobody could read.
+  //
+  // legal_documents is `allow read: if true`. It has to be readable without
+  // signing in, because these terms are shown ON the sign-up screen — the
+  // alternative is asking someone to agree to something they cannot open until
+  // after they have agreed to it.
+  //
+  // platform_config was NOT widened to fix this. It holds commission rates.
+  //
+  // NOTE: driver_app and the consumer app have the same latent bug for a
+  // different reason — they read content_pages, which requires auth, from a
+  // pre-auth screen. Their terms have always been the hardcoded fallback too.
   String? _hostTermsFromDb;
   String? _hostPrivacyFromDb;
 
   Future<void> _loadHostLegal() async {
     try {
       final snap = await FirebaseFirestore.instance
-          .collection('platform_config')
+          .collection('legal_documents')
           .doc('host_legal')
           .get();
       final d = snap.data();
@@ -523,6 +558,24 @@ website.
 
     final FormState? form = _formKey.currentState;
     if (form == null || !form.validate()) return;
+
+    // ── LEGAL GATE ─────────────────────────────────────────────────────────
+    //
+    // Checked BEFORE sendOtp, not after. An SMS costs money and, more to the
+    // point, sending one means Firebase has already accepted the phone number
+    // — so a host who had not agreed to anything would be part way into an
+    // account before being asked.
+    //
+    // Returning users skip it: they agreed at signup.
+    if (!_isReturningUser && !_acceptedLegal) {
+      setState(() => _showLegalError = true);
+      await _showErrorDialog(
+        'Please accept the terms',
+        'Tick the box to confirm you agree to the Terms & Conditions and '
+            'Privacy Policy before continuing.',
+      );
+      return;
+    }
 
     FocusScope.of(context).unfocus();
 
@@ -919,61 +972,151 @@ website.
                             ),
                           ),
 
-                          // ── LEGAL ──────────────────────────────────────────
+                          // ── LEGAL — A TICK BOX, NOT A SENTENCE ─────────────
                           //
-                          // Same pattern as driver_app and the consumer app:
-                          // tappable text rather than a tick box, so the
-                          // wording is identical across the estate.
+                          // MOVED HERE 8 August 2026 from the registration
+                          // screen, at Mian's request, and it belongs here.
+                          //
+                          // It used to be a passive line — "By continuing, you
+                          // agree to our Terms" — on this screen, with the
+                          // actual tick box buried in a section card two
+                          // screens later, most of the way down a long form.
+                          //
+                          // That is the wrong order twice over. The host had
+                          // already handed over their phone number, received
+                          // an SMS code and typed their name, address and
+                          // company number BEFORE being asked to agree to
+                          // anything. And a passive "by continuing" line is a
+                          // weaker record of consent than a box somebody
+                          // deliberately ticked.
+                          //
+                          // Now: nothing happens until it is ticked. The
+                          // Continue button below is disabled until then, so
+                          // no phone number is submitted and no SMS is sent
+                          // before the host has agreed.
                           //
                           // Both documents are linked, not just terms. A host
                           // hands over identity documents and a property
                           // address, so the privacy policy is the one they are
                           // more likely to want before typing anything.
+                          //
+                          // Returning users do not see it — they agreed when
+                          // they signed up, and re-asking implies the terms
+                          // changed when they have not.
                           if (!_isReturningUser) ...<Widget>[
                             const SizedBox(height: 18),
-                            Center(
-                              child: RichText(
-                                textAlign: TextAlign.center,
-                                text: TextSpan(
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    color: Colors.black54,
-                                    height: 1.5,
+                            InkWell(
+                              onTap: () => setState(() {
+                                _acceptedLegal = !_acceptedLegal;
+                                _showLegalError = false;
+                              }),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: _showLegalError
+                                      ? Colors.red.withValues(alpha: 0.04)
+                                      : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _showLegalError
+                                        ? Colors.red.shade300
+                                        : (_acceptedLegal
+                                            ? _goOutsBlue
+                                            : Colors.grey.shade300),
+                                    width: _acceptedLegal ? 1.4 : 1,
                                   ),
-                                  children: <InlineSpan>[
-                                    const TextSpan(
-                                      text: 'By continuing, you agree to our ',
-                                    ),
-                                    TextSpan(
-                                      text: 'Terms & Conditions',
-                                      recognizer: TapGestureRecognizer()
-                                        ..onTap = () =>
-                                            _showLegalSheet(terms: true),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: _goOutsBlue,
-                                        decoration: TextDecoration.underline,
-                                        decorationColor: _goOutsBlue,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    // Not a bare Checkbox: the whole box is
+                                    // tappable, which matters for an audience
+                                    // our own brief calls "often older and
+                                    // less confident with apps". The links
+                                    // inside still work independently.
+                                    SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: Checkbox(
+                                        value: _acceptedLegal,
+                                        activeColor: _goOutsBlue,
+                                        onChanged: (bool? v) => setState(() {
+                                          _acceptedLegal = v ?? false;
+                                          _showLegalError = false;
+                                        }),
+                                        materialTapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
                                       ),
                                     ),
-                                    const TextSpan(text: ' and '),
-                                    TextSpan(
-                                      text: 'Privacy Policy',
-                                      recognizer: TapGestureRecognizer()
-                                        ..onTap = () =>
-                                            _showLegalSheet(terms: false),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: _goOutsBlue,
-                                        decoration: TextDecoration.underline,
-                                        decorationColor: _goOutsBlue,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: RichText(
+                                        text: TextSpan(
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black87,
+                                            height: 1.5,
+                                          ),
+                                          children: <InlineSpan>[
+                                            const TextSpan(
+                                                text: 'I agree to the '),
+                                            TextSpan(
+                                              text: 'Terms & Conditions',
+                                              recognizer:
+                                                  TapGestureRecognizer()
+                                                    ..onTap = () =>
+                                                        _showLegalSheet(
+                                                            terms: true),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                color: _goOutsBlue,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                                decorationColor: _goOutsBlue,
+                                              ),
+                                            ),
+                                            const TextSpan(text: ' and the '),
+                                            TextSpan(
+                                              text: 'Privacy Policy',
+                                              recognizer:
+                                                  TapGestureRecognizer()
+                                                    ..onTap = () =>
+                                                        _showLegalSheet(
+                                                            terms: false),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                color: _goOutsBlue,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                                decorationColor: _goOutsBlue,
+                                              ),
+                                            ),
+                                            const TextSpan(text: '.'),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                    const TextSpan(text: '.'),
                                   ],
                                 ),
                               ),
                             ),
+                            if (_showLegalError) ...<Widget>[
+                              const SizedBox(height: 6),
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Text(
+                                  'Please accept the Terms & Conditions and '
+                                  'Privacy Policy to continue.',
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
 
                           // ── ALREADY HAVE AN ACCOUNT ────────────────────────
