@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:goouts_host/features/common/goouts_sheet.dart';
 
 /// Standalone pre-authentication support bottom sheet.
+import '../../short_stay/host/host_collection.dart';
 /// Used on Login and Registration screens — no uid required.
 /// Writes directly to support_requests with preAuthTicket: true.
 void showPreAuthSupportSheet(BuildContext context, {String accountType = 'driver'}) {
@@ -58,7 +59,7 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
 
   String get _sourceCollection {
     switch (widget.accountType) {
-      case 'business':   return 'businesses';
+      case 'business':   return kStayHostsCollection;
       case 'cab_driver': return 'cab_drivers';
       default:           return 'drivers';
     }

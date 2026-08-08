@@ -10,6 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../theme/goouts_colors.dart';
 
+import 'host_bottom_nav.dart';
+
 
 class HostPreArrivalCaptureScreen extends StatelessWidget {
   const HostPreArrivalCaptureScreen({super.key});
@@ -232,7 +234,7 @@ class HostPreArrivalCaptureScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: const HostBottomNav(current: HostTab.bookings),
     );
   }
 
@@ -287,28 +289,6 @@ class HostPreArrivalCaptureScreen extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: GoOutsColors.surface,
-        border: Border(top: BorderSide(color: GoOutsColors.background, width: 1)),
-      ),
-      child: BottomNavigationBar(
-        elevation: 0,
-        backgroundColor: GoOutsColors.surface,
-        selectedItemColor: GoOutsColors.primary,
-        unselectedItemColor: GoOutsColors.body,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Bookings'),
-          BottomNavigationBarItem(icon: Icon(Icons.payments), label: 'Earnings'),
-          BottomNavigationBarItem(icon: Icon(Icons.menu), label: 'Menu'),
         ],
       ),
     );

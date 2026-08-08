@@ -7,6 +7,7 @@ import '../auth/login_screen.dart';
 import '../short_stay/host/host_routes.dart';
 
 /// Landing screen for a signed-in host, shown before the dashboard.
+import '../short_stay/host/host_collection.dart';
 ///
 /// It exists as a separate screen from HostDashboardScreen for one reason:
 /// KYC state. createStayListing rejects any host whose /businesses record is
@@ -45,7 +46,7 @@ class HostHomeScreen extends StatelessWidget {
           ? const Center(child: Text('Not signed in.'))
           : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
-                  .collection('businesses')
+                  .collection(kStayHostsCollection)
                   .doc(user.uid)
                   .snapshots(),
               builder: (context, snapshot) {
@@ -55,14 +56,28 @@ class HostHomeScreen extends StatelessWidget {
 
                 final Map<String, dynamic> data = snapshot.data?.data() ?? {};
 
-                // Two field names are checked because the two are not yet
-                // consistent across the estate: driver_app writes
-                // businessProfileVerificationStatus, the newer server code
-                // reads kycStatus. requireVerifiedHost() in stay_host.js
-                // accepts either, so this must too — otherwise a host the
-                // server considers approved would be told they are pending.
+                // THREE field names are checked, because three different
+                // parts of the estate write verification to three different
+                // places:
+                //
+                //   kycStatus                            server / newer code
+                //   businessProfileVerificationStatus    driver_app
+                //   status                               the ADMIN PANEL
+                //
+                // The third was added 8 August 2026 after a host was
+                // approved in the admin panel and still saw "Verification in
+                // progress" on their phone. The admin panel's Approve button
+                // wrote only `status: 'APPROVED'`, which nothing read. The
+                // panel now writes all three, but this fallback stays: any
+                // record approved BEFORE that fix has only `status`, and
+                // without this line those hosts would stay locked out
+                // forever with no way to tell why.
+                //
+                // Read in order of authority — kycStatus is the field the
+                // server trusts, so it wins if present.
                 final String kyc = (data['kycStatus'] ??
                         data['businessProfileVerificationStatus'] ??
+                        data['status'] ??
                         'pending')
                     .toString()
                     .toLowerCase();

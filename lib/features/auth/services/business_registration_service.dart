@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/business_model.dart';
 
+import '../../short_stay/host/host_collection.dart';
 class BusinessRegistrationService {
   final FirebaseFirestore _firestore;
 
@@ -10,7 +11,7 @@ class BusinessRegistrationService {
 
   Future<void> registerBusiness(BusinessModel business) async {
     final DocumentReference<Map<String, dynamic>> docRef =
-        _firestore.collection('businesses').doc(business.uid);
+        _firestore.collection(kStayHostsCollection).doc(business.uid);
 
     final DocumentSnapshot<Map<String, dynamic>> snapshot = await docRef.get();
     final Map<String, dynamic> existingData = snapshot.data() ?? <String, dynamic>{};

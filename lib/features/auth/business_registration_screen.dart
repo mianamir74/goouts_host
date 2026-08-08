@@ -13,6 +13,7 @@ import '../legal/terms_and_conditions_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_host/features/common/goouts_sheet.dart';
 
+import '../short_stay/host/host_collection.dart';
 class BusinessRegistrationScreen extends StatefulWidget {
   const BusinessRegistrationScreen({
     super.key,
@@ -333,7 +334,7 @@ class _BusinessRegistrationScreenState
   }) async {
     final Reference ref = FirebaseStorage.instance
         .ref()
-        .child('businesses')
+        .child('stay_hosts')
         .child('selfies')
         .child('$uid.jpg');
     await ref.putFile(File(selfieImage.path));
@@ -749,7 +750,7 @@ class _BusinessRegistrationScreenState
       }
 
       await FirebaseFirestore.instance
-          .collection('businesses')
+          .collection(kStayHostsCollection)
           .doc(currentUser.uid)
           .set(businessData, SetOptions(merge: true));
 

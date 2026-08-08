@@ -10,6 +10,7 @@ import 'business_referral_code_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_host/features/common/goouts_sheet.dart';
 
+import '../short_stay/host/host_collection.dart';
 class OtpVerificationScreen extends StatefulWidget {
   final String verificationId;
   final String phoneNumber;
@@ -191,10 +192,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     // two dropped queries also cost two sequential round trips with a 6-second
     // timeout each — on a bad connection that was up to 12 seconds of a user
     // staring at a spinner directly after entering their code.
-    _bc('completeVerification: querying businesses');
+    _bc('completeVerification: querying stay_hosts');
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
     final DocumentSnapshot<Map<String, dynamic>> businessResult = await firestore
-        .collection('businesses')
+        .collection(kStayHostsCollection)
         .doc(user.uid)
         .get()
         .timeout(const Duration(seconds: 6));

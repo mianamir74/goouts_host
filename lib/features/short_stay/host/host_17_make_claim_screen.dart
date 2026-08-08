@@ -10,6 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../theme/goouts_colors.dart';
 
+import 'host_bottom_nav.dart';
+
 
 class MakeClaimScreen extends StatefulWidget {
   const MakeClaimScreen({super.key});
@@ -99,7 +101,7 @@ class _MakeClaimScreenState extends State<MakeClaimScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: const HostBottomNav(current: HostTab.bookings),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _buildSubmitButton(),
     );
@@ -377,28 +379,6 @@ class _MakeClaimScreenState extends State<MakeClaimScreen> {
             const Icon(Icons.chevron_right, color: Colors.white),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: GoOutsColors.surface,
-        border: Border(top: BorderSide(color: Color(0xFFEDF2F7), width: 1)),
-      ),
-      child: BottomNavigationBar(
-        elevation: 0,
-        backgroundColor: GoOutsColors.surface,
-        selectedItemColor: GoOutsColors.primary,
-        unselectedItemColor: GoOutsColors.onSurfaceVariant,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_month_outlined), label: 'Bookings'),
-          BottomNavigationBarItem(icon: Icon(Icons.payments_outlined), label: 'Earnings'),
-          BottomNavigationBarItem(icon: Icon(Icons.menu), label: 'Menu'),
-        ],
       ),
     );
   }

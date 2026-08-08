@@ -10,6 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../theme/goouts_colors.dart';
 
+import 'host_bottom_nav.dart';
+
 
 class HostEarningsScreen extends StatelessWidget {
   const HostEarningsScreen({super.key});
@@ -63,7 +65,7 @@ class HostEarningsScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: const HostBottomNav(current: HostTab.earnings),
     );
   }
 
@@ -492,29 +494,6 @@ class HostEarningsScreen extends StatelessWidget {
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: GoOutsColors.surface,
-        border: Border(top: BorderSide(color: Color(0xFFEDF2F7), width: 1)),
-      ),
-      child: BottomNavigationBar(
-        elevation: 0,
-        backgroundColor: GoOutsColors.surface,
-        selectedItemColor: GoOutsColors.primary,
-        unselectedItemColor: GoOutsColors.onSurfaceVariant,
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 2, // Earnings active
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_month_outlined), label: 'Bookings'),
-          BottomNavigationBarItem(icon: Icon(Icons.payments_outlined), label: 'Earnings'),
-          BottomNavigationBarItem(icon: Icon(Icons.menu), label: 'Menu'),
-        ],
       ),
     );
   }

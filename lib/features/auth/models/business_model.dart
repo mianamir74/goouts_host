@@ -147,6 +147,27 @@ class BusinessModel {
       'uid': uid.trim(),
       'accountType': 'business',
       'dashboardRole': 'business',
+
+      // ── WHICH APP THIS PERSON SIGNED UP IN ─────────────────────────────
+      //
+      // ADDED 8 August 2026, after a host signed up on build 6 and appeared
+      // in the admin panel under "Lead / Business Partner" — factually
+      // wrong, and confusing for whoever has to review them.
+      //
+      // It was not a display bug. Host registration REUSES driver_app's
+      // Business Partner flow wholesale (deliberately — a pub with rooms is
+      // one business, not two accounts), and it wrote a /businesses record
+      // that was byte-for-byte indistinguishable from a courier partner's.
+      // The admin panel had nothing to tell them apart by, so it could only
+      // put them all in one list.
+      //
+      // These three fields are that missing signal. None of them is in
+      // driverProtectedFields(), so the client is allowed to write them —
+      // unlike kycStatus and status, which are admin-only on update and are
+      // deliberately NOT set here.
+      'isHost': true,
+      'registrationSource': 'goouts_host',
+      'businessType': 'short_stay_host',
       'phoneNumber': phoneNumber.trim(),
       'phone': phoneNumber.trim(),
       'prefix': prefix.trim(),

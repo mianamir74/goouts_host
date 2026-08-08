@@ -15,6 +15,7 @@ import 'otp_verification_screen.dart';
 import 'widgets/pre_auth_support_sheet.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
+import '../short_stay/host/host_collection.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -32,9 +33,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isLoading = false;
-  // Constant in this app. A host IS a `business` record — see the note in
-  // didChangeDependencies. Kept as a field rather than inlined so the OTP
-  // screen and the `/users` write below keep their existing signatures.
+  // Constant in this app — this app enrols hosts and nothing else.
+  //
+  // The value is still the string 'business' because it is passed to the
+  // OTP screen and written to /users, and both of those already understand
+  // it. It does NOT mean a host is a driver_app Business Partner: as of
+  // 8 August 2026 a host is a /stay_hosts record and has nothing to do with
+  // /businesses. See host_collection.dart for why that changed.
   final String _selectedAccountType = 'business';
   bool _hasReadRouteArgs = false;
   bool _isReturningUser = false;
@@ -98,10 +103,9 @@ class _LoginScreenState extends State<LoginScreen> {
       // GoOuts Host: account type is NOT read from route arguments.
       //
       // In driver_app this block chose between driver / cab_driver / business
-      // because that one app enrols all three. This app enrols hosts only, and
-      // a host is a `business` record — the same record type a Business Partner
-      // gets. There is nothing to choose, so accepting an accountType argument
-      // here would only create a way to land in a role this app cannot serve.
+      // because that one app enrols all three. This app enrols hosts only, so
+      // there is nothing to choose, and accepting an accountType argument here
+      // would only create a way to land in a role this app cannot serve.
 
       // Pre-fill mobile number if passed (e.g. after logout)
       final String mobile = (args['mobile'] ?? '').toString().trim();
@@ -367,16 +371,22 @@ website.
 
   Future<void> _navigateToHomeForExistingUser(User user) async {
     final firestore = FirebaseFirestore.instance;
-    // Only `businesses` is read here.
+    // Only /stay_hosts is read here.
     //
     // driver_app also checked /drivers and /cab_drivers, because it had a home
     // screen for each. This app does not — and the important consequence is
-    // that a driver who ALSO wants to let out a property is treated as a new
+    // that a courier who ALSO wants to let out a property is treated as a new
     // host, not turned away. One phone number can hold both roles; they live
     // in different collections and neither blocks the other.
+    //
+    // ⚠ CHANGED 8 August 2026 from /businesses. That was the driver LEAD
+    // business partner collection and hosts never belonged in it — see
+    // host_collection.dart. Reading it here meant a lead partner who had
+    // never heard of Short Stay would be signed straight into the host app.
     final DocumentSnapshot business;
     try {
-      business = await firestore.collection('businesses').doc(user.uid).get();
+      business =
+          await firestore.collection(kStayHostsCollection).doc(user.uid).get();
     } catch (e) {
       if (!mounted) return;
       await _showErrorDialog('Connection Error',
@@ -484,10 +494,10 @@ website.
     final User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // See _navigateToHomeForExistingUser — only `businesses` is consulted.
+    // See _navigateToHomeForExistingUser — only /stay_hosts is consulted.
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
     final DocumentSnapshot<Map<String, dynamic>> business =
-        await firestore.collection('businesses').doc(user.uid).get();
+        await firestore.collection(kStayHostsCollection).doc(user.uid).get();
 
     if (!mounted) return;
 
@@ -594,13 +604,22 @@ website.
     );
   }
 
-  String _accountTypeHelperText() {
-    if (_selectedAccountType == 'business') {
-      return 'Business Partner login';
-    }
-
-    return 'Driver login';
-  }
+  /// ── SAYS "HOST", BECAUSE THIS IS THE HOST APP ──────────────────────────
+  ///
+  /// This read "Business Partner login" until 8 August 2026. It was
+  /// inherited verbatim from driver_app, where the same screen serves
+  /// couriers and business partners and the line tells you which one you
+  /// are signing in as.
+  ///
+  /// Here there is only one kind of account, so the line answered a question
+  /// nobody asked and answered it with the wrong word. Someone signing up to
+  /// let a property was told they were logging in as a Business Partner,
+  /// with no explanation of what that meant or why.
+  ///
+  /// The underlying record IS still a /businesses record — that part of the
+  /// design is deliberate and unchanged. This is what the host is called,
+  /// not what the database calls them.
+  String _accountTypeHelperText() => 'Host sign in';
 
   @override
   Widget build(BuildContext context) {
@@ -964,36 +983,54 @@ website.
                           // enrolment, depending on whether a /businesses
                           // record exists. There is nothing to switch to.
                           //
-                          // The line is still here because its ABSENCE is what
-                          // people notice — every other app has it, and without
-                          // it a returning host wonders whether they are about
-                          // to create a second account. It reassures rather
-                          // than navigates.
+                          // ⚠ REWRITTEN 8 August 2026. This used to render
+                          // "Sign in" in bold GoOuts blue — which is exactly
+                          // how every tappable link in this app looks. It was
+                          // never tappable, because there is nowhere for it to
+                          // go, and the first person to test the app on a real
+                          // phone reported it as a broken login button. That
+                          // is the correct reading: something that looks like
+                          // a link and does nothing is a bug, whatever the
+                          // intention behind it.
+                          //
+                          // It now states the fact plainly in ordinary body
+                          // text, with no link styling anywhere. The
+                          // reassurance survives; the false affordance does
+                          // not.
                           if (!_isReturningUser) ...<Widget>[
                             const SizedBox(height: 18),
                             Center(
-                              child: RichText(
-                                textAlign: TextAlign.center,
-                                text: const TextSpan(
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.black54,
-                                  ),
-                                  children: <InlineSpan>[
-                                    TextSpan(text: 'Already have an account? '),
-                                    TextSpan(
-                                      text: 'Sign in',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: _goOutsBlue,
-                                      ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Icon(
+                                      Icons.info_outline_rounded,
+                                      size: 16,
+                                      color: Colors.black38,
                                     ),
-                                    TextSpan(
-                                      text:
-                                          '\nUse the same number — we will know it is you.',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        color: Colors.black38,
+                                    SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        'Already have an account? Enter the same '
+                                        'mobile number above — signing in and '
+                                        'signing up are the same step here, and '
+                                        'you will not create a second account.',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.black54,
+                                          height: 1.45,
+                                        ),
                                       ),
                                     ),
                                   ],
