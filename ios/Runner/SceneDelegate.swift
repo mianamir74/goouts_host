@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import FirebaseAuth
+import FirebaseCore
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  THE reCAPTCHA CALLBACK ARRIVES HERE, NOT IN AppDelegate.
@@ -43,12 +44,18 @@ import FirebaseAuth
 
 class SceneDelegate: FlutterSceneDelegate {
 
+  // ⚠ Every Auth.auth() below is guarded. Build 8 crashed on launch because
+  // AppDelegate touched Auth before firebase_core had configured the default
+  // app — see the long note in AppDelegate.swift. willConnectTo runs even
+  // earlier than that did, so the same mistake is even easier to make here.
+  private var firebaseReady: Bool { FirebaseApp.app() != nil }
+
   /// The app was already running and a URL brought it forward. This is the
   /// path the reCAPTCHA return takes in practice.
   override func scene(_ scene: UIScene,
                       openURLContexts URLContexts: Set<UIOpenURLContext>) {
     for context in URLContexts {
-      if Auth.auth().canHandle(context.url) {
+      if firebaseReady, Auth.auth().canHandle(context.url) {
         // Claimed by Firebase Auth — do not pass it on. Letting it continue to
         // super means the plugin registry also tries to route a URL that has
         // already been consumed.
@@ -66,8 +73,13 @@ class SceneDelegate: FlutterSceneDelegate {
                       options connectionOptions: UIScene.ConnectionOptions) {
     super.scene(scene, willConnectTo: session, options: connectionOptions)
 
+    // ⚠ firebaseReady is nearly always FALSE here — this runs during launch,
+    // before the Flutter engine has registered firebase_core. Unguarded, this
+    // line crashes the app on any URL-triggered cold launch. It is written to
+    // skip rather than crash; AppDelegate's handler picks the URL up once the
+    // engine is alive.
     for context in connectionOptions.urlContexts {
-      if Auth.auth().canHandle(context.url) { return }
+      if firebaseReady, Auth.auth().canHandle(context.url) { return }
     }
   }
 }
