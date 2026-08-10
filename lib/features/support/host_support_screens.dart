@@ -30,7 +30,19 @@ import 'host_support_service.dart';
 //  LIST
 // ═══════════════════════════════════════════════════════════════════════════
 class HostSupportTicketsScreen extends StatefulWidget {
-  const HostSupportTicketsScreen({super.key});
+  const HostSupportTicketsScreen({super.key, this.embedded = false});
+
+  /// When true, render ONLY the list — no Scaffold, no AppBar.
+  ///
+  /// The Message Center shows this list inside its Support tab. It
+  /// already has its own Scaffold, app bar and bottom nav, so the full
+  /// screen version would nest a second Scaffold and put a second
+  /// "Messages" title halfway down the page.
+  ///
+  /// Reused rather than reimplemented on purpose: this widget owns the
+  /// pre-auth phone match and the read-state handling, and a second
+  /// copy of that logic would drift.
+  final bool embedded;
 
   @override
   State<HostSupportTicketsScreen> createState() =>
@@ -74,6 +86,8 @@ class _HostSupportTicketsScreenState extends State<HostSupportTicketsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) return _list();
+
     return Scaffold(
       backgroundColor: GoOutsColors.background,
       appBar: AppBar(
@@ -89,7 +103,12 @@ class _HostSupportTicketsScreenState extends State<HostSupportTicketsScreen> {
                 fontSize: 20,
                 fontWeight: FontWeight.w700)),
       ),
-      body: RefreshIndicator(
+      body: _list(),
+    );
+  }
+
+  Widget _list() {
+    return RefreshIndicator(
         onRefresh: _load,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -106,8 +125,7 @@ class _HostSupportTicketsScreenState extends State<HostSupportTicketsScreen> {
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (context, i) => _card(_tickets[i]),
                       ),
-      ),
-    );
+      );
   }
 
   Widget _centered(IconData icon, String text) => ListView(

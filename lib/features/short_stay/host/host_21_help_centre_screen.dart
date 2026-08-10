@@ -37,7 +37,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../theme/goouts_colors.dart';
-import '../../auth/widgets/pre_auth_support_sheet.dart';
 import 'host_bottom_nav.dart';
 import 'host_routes.dart';
 
@@ -494,7 +493,8 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
         // that has been answered wastes their time and the admin's.
         OutlinedButton.icon(
           onPressed: () =>
-              Navigator.of(context).pushNamed(HostRoutes.messages),
+              Navigator.of(context)
+                  .pushNamed(HostRoutes.messageCenter, arguments: 1),
           icon: const Icon(Icons.forum_outlined, size: 19),
           label: Text(
             'Your messages',
@@ -518,7 +518,7 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
           // accountType 'business' is what stamps the ticket so admin can tell
           // where it came from — see _sourceCollection in that sheet.
           onPressed: () =>
-              showPreAuthSupportSheet(context, accountType: 'business'),
+              Navigator.of(context).pushNamed(HostRoutes.contactSupport),
           icon: const Icon(Icons.headset_mic_outlined,
               color: Colors.white, size: 20),
           label: Text(

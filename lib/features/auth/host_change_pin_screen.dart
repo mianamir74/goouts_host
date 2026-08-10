@@ -30,7 +30,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/goouts_colors.dart';
-import 'widgets/pre_auth_support_sheet.dart';
+import '../short_stay/host/host_routes.dart';
 
 class HostChangePinScreen extends StatefulWidget {
   const HostChangePinScreen({super.key});
@@ -262,7 +262,7 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
           Center(
             child: GestureDetector(
               onTap: () =>
-                  showPreAuthSupportSheet(context, accountType: 'business'),
+                  Navigator.of(context).pushNamed(HostRoutes.contactSupport),
               child: Text(
                 'Forgotten your current PIN?',
                 style: GoogleFonts.inter(

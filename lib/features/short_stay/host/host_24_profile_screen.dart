@@ -35,7 +35,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../theme/goouts_colors.dart';
 import '../../auth/login_screen.dart';
-import '../../auth/widgets/pre_auth_support_sheet.dart';
 import '../../short_stay/host/host_collection.dart';
 import 'host_bottom_nav.dart';
 import 'host_routes.dart';
@@ -533,9 +532,10 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
             ),
             onTap: () {
               if (unread > 0) {
-                Navigator.of(context).pushNamed(HostRoutes.messages);
+                Navigator.of(context)
+                    .pushNamed(HostRoutes.messageCenter, arguments: 1);
               } else {
-                showPreAuthSupportSheet(context, accountType: 'business');
+                Navigator.of(context).pushNamed(HostRoutes.contactSupport);
               }
             },
           );
@@ -619,8 +619,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                 if (rejected) ...<Widget>[
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: () => showPreAuthSupportSheet(context,
-                        accountType: 'business'),
+                    onTap: () => Navigator.of(context).pushNamed(HostRoutes.contactSupport),
                     child: Text(
                       'Contact support',
                       style: GoogleFonts.inter(

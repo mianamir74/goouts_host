@@ -37,6 +37,8 @@ import 'host_routes.dart';
 
 import 'host_collection.dart';
 import 'friendly_error.dart';
+import 'host_bottom_nav.dart';
+import '../../support/host_support_service.dart';
 
 class HostDashboardScreen extends StatefulWidget {
   const HostDashboardScreen({super.key});
@@ -163,8 +165,9 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: <Widget>[
-          // Was a bare Icon — decoration that looked like a button. Both of
+          // Was a bare Icon — decoration that looked like a button. All of
           // these now go somewhere.
+          _messagesAction(),
           IconButton(
             tooltip: 'Notification settings',
             icon: const Icon(Icons.notifications_none,
@@ -198,7 +201,15 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _bottomNav(),
+      // Shared nav, same as the other thirteen screens.
+      //
+      // This screen used to build its own five tabs, and tab 4 was
+      // "Inbox" here while it is "Earnings" everywhere else. Tapping it
+      // opened the guest-chat screen, which then drew the SHARED nav with
+      // Bookings highlighted — so a host landed on a page titled Messages,
+      // saw "not open yet", and had Bookings lit up underneath. Three
+      // wrongs in one tap. Messages now lives in the app bar above.
+      bottomNavigationBar: const HostBottomNav(current: HostTab.home),
     );
   }
 
@@ -755,56 +766,6 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
     );
   }
 
-  // ── BOTTOM NAV ───────────────────────────────────────────────────────────
-  //
-  // ⚠ THE ORIGINAL HAD NO onTap AT ALL. Five tabs that moved a highlight and
-  // navigated nowhere — the single most visible fault on the screen.
-  Widget _bottomNav() {
-    const destinations = <String>[
-      '', // Dashboard — already here, so nothing to push.
-      HostRoutes.requests,
-      HostRoutes.myListings,
-      HostRoutes.messaging,
-      HostRoutes.profile,
-    ];
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: GoOutsColors.surface,
-        border:
-            Border(top: BorderSide(color: GoOutsColors.border, width: 1)),
-      ),
-      child: BottomNavigationBar(
-        elevation: 0,
-        backgroundColor: GoOutsColors.surface,
-        selectedItemColor: GoOutsColors.primary,
-        unselectedItemColor: GoOutsColors.body,
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 0,
-        selectedLabelStyle:
-            GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 11),
-        unselectedLabelStyle:
-            GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 11),
-        onTap: (i) {
-          final route = destinations[i];
-          if (route.isEmpty) return; // Dashboard tab, already showing.
-          Navigator.of(context).pushNamed(route);
-        },
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_outlined), label: 'Dashboard'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined), label: 'Bookings'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.holiday_village_outlined), label: 'Listings'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.mail_outline), label: 'Inbox'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline), label: 'Profile'),
-        ],
-      ),
-    );
-  }
 
   // ── SHARED BITS ──────────────────────────────────────────────────────────
 
@@ -843,6 +804,53 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
     final t = '${to.day} ${_months[to.month - 1]}';
     return '$f – $t';
   }
+
+  // ── MESSAGES ─────────────────────────────────────────────────────────────
+  //
+  // Badge count comes from HostSupportService.unreadCountStream(), the same
+  // stream the profile tile and the Message Center's Support chip use. One
+  // source, so the three can never show different numbers.
+  Widget _messagesAction() => StreamBuilder<int>(
+        stream: HostSupportService().unreadCountStream(),
+        builder: (context, snap) {
+          final n = snap.data ?? 0;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              IconButton(
+                tooltip: 'Messages',
+                icon: const Icon(Icons.mail_outline, color: GoOutsColors.navy),
+                onPressed: () => Navigator.of(context)
+                    .pushNamed(HostRoutes.messageCenter),
+              ),
+              if (n > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: GoOutsColors.error,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: GoOutsColors.surface, width: 1.5),
+                    ),
+                    constraints:
+                        const BoxConstraints(minWidth: 17, minHeight: 17),
+                    child: Text(
+                      n > 9 ? '9+' : '$n',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      );
 }
 
 /// One row of the Manage list. A named class rather than a record so the
@@ -853,4 +861,5 @@ class _QuickAction {
   final String label;
   final IconData icon;
   final String route;
+
 }
