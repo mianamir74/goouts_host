@@ -36,6 +36,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../theme/goouts_colors.dart';
 import 'host_bottom_nav.dart';
+import 'friendly_error.dart';
 
 /// Must match HOST_BLOCK in functions/stay_host.js. If one changes, both do.
 const String kHostBlockSentinel = 'HOST_BLOCKED';
@@ -100,12 +101,11 @@ class _AvailabilityCalendarScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      final s = e.toString();
-      final i = s.indexOf('] ');
+      // Was e.toString() + substring, which put the Dart stack trace in the
+      // snackbar. See friendly_error.dart.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(i >= 0 && i + 2 < s.length
-            ? s.substring(i + 2)
-            : 'Could not save. Please try again.'),
+        content: Text(friendlyError(e,
+            fallback: 'Could not save your calendar. Please try again.')),
         backgroundColor: GoOutsColors.error,
       ));
     }

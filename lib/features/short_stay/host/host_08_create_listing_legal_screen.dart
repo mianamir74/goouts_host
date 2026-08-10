@@ -15,6 +15,7 @@ import 'host_routes.dart';
 import 'listing_draft.dart';
 
 import '../../../theme/goouts_colors.dart';
+import 'friendly_error.dart';
 
 
 class LegalComplianceScreen extends StatefulWidget {
@@ -80,12 +81,13 @@ class _LegalComplianceScreenState extends State<LegalComplianceScreen> {
         (route) => route.settings.name == HostRoutes.dashboard,
       );
     } catch (e) {
+      // Was e.toString() with a substring — which printed the whole Dart stack
+      // trace on screen under the message. See friendly_error.dart.
       if (!mounted) return;
-      final s = e.toString();
-      final i = s.indexOf('] ');
-      _say(i >= 0 && i + 2 < s.length
-              ? s.substring(i + 2)
-              : 'Could not save your property. Please try again.',
+      _say(
+          friendlyError(e,
+              fallback: 'Could not save your property. Check your connection '
+                  'and try again.'),
           isError: true);
     } finally {
       if (mounted) setState(() => _submitting = false);

@@ -37,6 +37,7 @@ import '../services/stay_host_service.dart';
 import 'host_routes.dart';
 
 import '../../../theme/goouts_colors.dart';
+import 'friendly_error.dart';
 
 
 class BookingRequestsScreen extends StatefulWidget {
@@ -207,9 +208,9 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen> {
     // The server sends a readable sentence for the cases a host can act on —
     // already answered, check-in date passed. Surface it rather than replacing
     // it with something generic that explains nothing.
-    final s = e.toString();
-    final i = s.indexOf('] ');
-    return i >= 0 && i + 2 < s.length ? s.substring(i + 2) : 'Something went wrong.';
+    // Was e.toString() + substring, which appended the whole Dart stack trace
+    // to the toast. See friendly_error.dart.
+    return friendlyError(e, fallback: 'Something went wrong. Please try again.');
   }
 
   void _toast(String msg, {bool isError = false}) {

@@ -25,6 +25,7 @@ import 'host_22_guest_messaging_screen.dart';
 import 'host_23_notification_settings_screen.dart';
 import 'host_24_profile_screen.dart';
 import 'host_25_property_analytics_screen.dart';
+import '../../support/host_support_screens.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Short Stay HOST routing.
@@ -100,6 +101,7 @@ class HostRoutes {
   static const analytics      = '/host/analytics';
   static const messaging      = '/host/messages';
   static const help           = '/host/help';
+  static const messages       = '/host/messages/support';
   static const notifications  = '/host/settings/notifications';
   static const profile        = '/host/profile';
 
@@ -112,6 +114,7 @@ class HostRoutes {
     calendar, requests, pricingAlert, booking, preArrival,
     makeClaim, claimStatus, claimDetails,
     earnings, analytics, messaging, help, notifications, profile,
+    messages,
   };
 
   static bool owns(String? name) => name != null && _all.contains(name);
@@ -148,6 +151,7 @@ class HostRoutes {
           analytics      => const PropertyAnalyticsScreen(),
           messaging      => const GuestMessagingScreen(),
           help           => const HelpCentreScreen(),
+          messages       => const HostSupportTicketsScreen(),
           notifications  => const NotificationSettingsScreen(),
           profile        => const HostProfileScreen(),
 

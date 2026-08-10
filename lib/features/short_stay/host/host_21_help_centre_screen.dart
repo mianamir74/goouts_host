@@ -39,6 +39,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/goouts_colors.dart';
 import '../../auth/widgets/pre_auth_support_sheet.dart';
 import 'host_bottom_nav.dart';
+import 'host_routes.dart';
 
 class HelpCentreScreen extends StatefulWidget {
   const HelpCentreScreen({super.key});
@@ -289,7 +290,37 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: ElevatedButton.icon(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+        // ── SEE PREVIOUS CONVERSATIONS. ADDED 9 August 2026. ─────────────
+        //
+        // Contact support below always worked; there was no way to read the
+        // REPLY. A host asked a question, an admin answered in the panel, and
+        // the answer had nowhere to appear.
+        //
+        // Placed ABOVE Contact support on purpose: someone arriving here has
+        // usually asked already, and sending a second ticket for a question
+        // that has been answered wastes their time and the admin's.
+        OutlinedButton.icon(
+          onPressed: () =>
+              Navigator.of(context).pushNamed(HostRoutes.messages),
+          icon: const Icon(Icons.forum_outlined, size: 19),
+          label: Text(
+            'Your messages',
+            style: GoogleFonts.inter(
+                fontSize: 15, fontWeight: FontWeight.w700),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: GoOutsColors.primary,
+            side: const BorderSide(color: GoOutsColors.primary),
+            minimumSize: const Size(double.infinity, 50),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton.icon(
           // Was onPressed: () {}. Opens the same sheet the sign-in screen
           // uses, which writes a real ticket to support_requests and appears
           // in the admin panel's Support section.
@@ -315,6 +346,8 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 0,
           ),
+        ),
+          ],
         ),
       ),
     );

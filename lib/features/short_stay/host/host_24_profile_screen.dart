@@ -39,6 +39,7 @@ import '../../auth/widgets/pre_auth_support_sheet.dart';
 import '../../short_stay/host/host_collection.dart';
 import 'host_bottom_nav.dart';
 import 'host_routes.dart';
+import '../../support/host_support_service.dart';
 
 class HostProfileScreen extends StatefulWidget {
   const HostProfileScreen({super.key});
@@ -347,6 +348,16 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                   .pushNamed(HostRoutes.notifications)),
           _tile(Icons.help_outline_rounded, 'Help centre',
               () => Navigator.of(context).pushNamed(HostRoutes.help)),
+          // ── MESSAGES. ADDED 9 August 2026, AND IT WAS THE MISSING HALF. ──
+          //
+          // Contact support below has always worked — it writes a real ticket
+          // that lands in the admin panel under Support → Hosts. What did not
+          // exist was any way to READ THE REPLY. An admin answered, and the
+          // host never saw it.
+          //
+          // The badge streams unreadByUser. Without it a host has no reason to
+          // open this screen and would only find the answer by chance.
+          _messagesTile(),
           _tile(Icons.headset_mic_outlined, 'Contact support',
               () => showPreAuthSupportSheet(context,
                   accountType: 'business')),
@@ -440,6 +451,63 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
         trailing: const Icon(Icons.chevron_right_rounded,
             color: GoOutsColors.onSurfaceVariant),
         onTap: onTap,
+      );
+
+  /// Messages, with a live unread badge.
+  ///
+  /// Built separately from _tile because the badge needs a stream and _tile is
+  /// deliberately dumb. StreamBuilder defaults to 0 while connecting, so the
+  /// row never flickers a badge it then removes.
+  Widget _messagesTile() => StreamBuilder<int>(
+        stream: HostSupportService().unreadCountStream(),
+        builder: (context, snap) {
+          final unread = snap.data ?? 0;
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.forum_outlined,
+                color: GoOutsColors.primary),
+            title: Text('Messages',
+                style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: GoOutsColors.navy)),
+            subtitle: Text(
+              unread > 0
+                  ? '$unread new ${unread == 1 ? "reply" : "replies"} from support'
+                  : 'Your support conversations',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: unread > 0
+                    ? GoOutsColors.primary
+                    : GoOutsColors.onSurfaceVariant,
+                fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w400,
+              ),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (unread > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                        color: GoOutsColors.primary,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: Text('$unread',
+                        style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white)),
+                  ),
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right_rounded,
+                    color: GoOutsColors.onSurfaceVariant),
+              ],
+            ),
+            onTap: () =>
+                Navigator.of(context).pushNamed(HostRoutes.messages),
+          );
+        },
       );
 
   Widget _notice(String text) => Center(

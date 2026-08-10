@@ -36,6 +36,8 @@ import '../services/stay_host_service.dart';
 import 'host_routes.dart';
 
 import 'host_collection.dart';
+import 'friendly_error.dart';
+
 class HostDashboardScreen extends StatefulWidget {
   const HostDashboardScreen({super.key});
 
@@ -96,7 +98,10 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
       return 'Could not reach GoOuts. Check your connection and pull down '
           'to refresh.';
     }
-    return 'Could not load booking requests.\n$s';
+    // Was 'Could not load booking requests.\n$s' — and $s is e.toString(),
+    // which carries the full Dart stack trace onto the dashboard. See
+    // friendly_error.dart.
+    return friendlyError(e, fallback: 'Could not load booking requests.');
   }
 
   Future<void> _respond(HostBookingRequest r, {required bool accept}) async {
