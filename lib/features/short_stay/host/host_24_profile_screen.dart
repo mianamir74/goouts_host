@@ -39,6 +39,7 @@ import '../../short_stay/host/host_collection.dart';
 import 'host_bottom_nav.dart';
 import 'host_routes.dart';
 import '../../support/host_support_service.dart';
+import 'host_26_notifications_screen.dart';
 
 class HostProfileScreen extends StatefulWidget {
   const HostProfileScreen({super.key});
@@ -355,38 +356,20 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
         _kycBanner(kyc, approved),
         const SizedBox(height: 8),
 
-        _section('Security', children: <Widget>[
-          _tile(Icons.lock_reset_rounded, 'Change PIN',
-              () => Navigator.of(context).pushNamed(HostRoutes.changePin)),
-        ]),
-
-        _section('Account', children: <Widget>[
-          _tile(Icons.notifications_none_rounded, 'Notifications',
-              () => Navigator.of(context)
-                  .pushNamed(HostRoutes.notifications)),
-          // ── FAQ + CONTACT SUPPORT, MATCHING goouts_app EXACTLY ───────────
-          //
-          // CHANGED 10 August 2026. This was three rows — Help centre,
-          // Messages, Contact support. goouts_app uses TWO, and its shape is
-          // better, so the host app now copies it rather than inventing a
-          // third arrangement:
-          //
-          //   FAQ              Icons.help_outline_rounded
-          //   Contact Support  Icons.headset_mic_outlined, with a RED unread
-          //                    badge, capped at 9+
-          //
-          // The clever part is the routing, and it is worth keeping: ONE row
-          // does both jobs. If support has replied, it opens the conversation.
-          // If not, it opens the form to start one. A host never has to work
-          // out which of two similar rows they want, and a waiting reply is
-          // never buried behind a row labelled something else.
-          //
-          // Named 'FAQ' rather than 'Help centre' deliberately — the same word
-          // in every GoOuts app, for the same screen.
-          _tile(Icons.help_outline_rounded, 'FAQ',
-              () => Navigator.of(context).pushNamed(HostRoutes.help)),
-          _contactSupportTile(),
-        ]),
+        // ── PREFERENCES ────────────────────────────────────────────────────
+        //
+        // The consumer app's Preferences card, ported. Same _sectionCard
+        // (white, radius 16, soft shadow), same tune_rounded header, same
+        // _menuRow (grey icon 20, title 14/w500, chevron, thin dividers).
+        //
+        // Pixel-identical rather than merely similar: GoOutsColors.primary is
+        // 0xFF0392CA and .navy is 0xFF0D1B3E, the exact values the consumer
+        // hardcodes as _primary and _dark.
+        //
+        // Refer a Friend is the one row deliberately NOT ported. There is no
+        // host referral scheme, and a row offering a reward that does not
+        // exist is worse than no row.
+        _preferencesCard(),
 
         const SizedBox(height: 8),
         OutlinedButton.icon(
@@ -402,6 +385,180 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
       ],
     );
   }
+
+  // ── PREFERENCES CARD — ported from goouts_app profile_screen ───────────
+  Widget _sectionCard({required Widget child}) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: GoOutsColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: child,
+      );
+
+  Widget _menuRow({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required Widget trailing,
+    required VoidCallback onTap,
+  }) =>
+      Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          splashColor: GoOutsColors.primary.withValues(alpha: 0.08),
+          highlightColor: GoOutsColors.primary.withValues(alpha: 0.04),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+            child: Row(
+              children: <Widget>[
+                Icon(icon, color: Colors.grey[500], size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(title,
+                          style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: GoOutsColors.navy)),
+                      if (subtitle != null) ...<Widget>[
+                        const SizedBox(height: 2),
+                        Text(subtitle,
+                            style: GoogleFonts.inter(
+                                fontSize: 12, color: Colors.grey[500])),
+                      ],
+                    ],
+                  ),
+                ),
+                trailing,
+              ],
+            ),
+          ),
+        ),
+      );
+
+  /// Red count pill + chevron, the consumer's trailing treatment.
+  Widget _countTrailing(int n) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (n > 0)
+            Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: GoOutsColors.error,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(n > 9 ? '9+' : '$n',
+                  style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white)),
+            ),
+          const Icon(Icons.chevron_right_rounded,
+              color: Colors.grey, size: 20),
+        ],
+      );
+
+  Widget _divider() => Divider(height: 1, color: Colors.grey[100]);
+
+  Widget _preferencesCard() => _sectionCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                const Icon(Icons.tune_rounded,
+                    color: GoOutsColors.primary, size: 20),
+                const SizedBox(width: 8),
+                Text('Preferences',
+                    style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: GoOutsColors.navy)),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Notifications = the FEED, as it means in goouts_app.
+            StreamBuilder<int>(
+              stream: hostUnreadNotificationsStream(),
+              builder: (context, snap) => _menuRow(
+                icon: Icons.notifications_outlined,
+                title: 'Notifications',
+                trailing: _countTrailing(snap.data ?? 0),
+                onTap: () => Navigator.of(context)
+                    .pushNamed(HostRoutes.notificationFeed),
+              ),
+            ),
+            _divider(),
+
+            StreamBuilder<int>(
+              stream: HostSupportService().unreadCountStream(),
+              builder: (context, snap) => _menuRow(
+                icon: Icons.message_outlined,
+                title: 'Messages',
+                trailing: _countTrailing(snap.data ?? 0),
+                onTap: () => Navigator.of(context)
+                    .pushNamed(HostRoutes.messageCenter),
+              ),
+            ),
+            _divider(),
+
+            // Not in the consumer's card — hosts need somewhere for the
+            // toggles, PIN and legal documents to live.
+            _menuRow(
+              icon: Icons.settings_outlined,
+              title: 'Settings',
+              trailing: const Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey, size: 20),
+              onTap: () =>
+                  Navigator.of(context).pushNamed(HostRoutes.settings),
+            ),
+            _divider(),
+
+            _menuRow(
+              icon: Icons.help_outline_rounded,
+              title: 'FAQ',
+              trailing: const Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey, size: 20),
+              onTap: () => Navigator.of(context).pushNamed(HostRoutes.help),
+            ),
+            _divider(),
+
+            // One row, two jobs — if support has replied it opens the
+            // conversation, otherwise the form to start one.
+            StreamBuilder<int>(
+              stream: HostSupportService().unreadCountStream(),
+              builder: (context, snap) {
+                final unread = snap.data ?? 0;
+                return _menuRow(
+                  icon: Icons.headset_mic_outlined,
+                  title: 'Contact Support',
+                  trailing: _countTrailing(unread),
+                  onTap: () => Navigator.of(context).pushNamed(
+                      unread > 0
+                          ? HostRoutes.messageCenter
+                          : HostRoutes.contactSupport,
+                      arguments: unread > 0 ? 1 : null),
+                );
+              },
+            ),
+          ],
+        ),
+      );
 
   Widget _section(String title,
           {required List<Widget> children, Widget? trailing}) =>
@@ -463,83 +620,6 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
             ),
           ],
         ),
-      );
-
-  Widget _tile(IconData icon, String label, VoidCallback onTap) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(icon, color: GoOutsColors.primary),
-        title: Text(label,
-            style: GoogleFonts.inter(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w600,
-                color: GoOutsColors.navy)),
-        trailing: const Icon(Icons.chevron_right_rounded,
-            color: GoOutsColors.onSurfaceVariant),
-        onTap: onTap,
-      );
-
-  /// Contact Support, with a live unread badge — the goouts_app row, copied.
-  ///
-  /// ── ONE ROW, TWO DESTINATIONS ────────────────────────────────────────────
-  ///
-  /// unread > 0  → the conversation, because support has already answered and
-  ///               that answer is the thing the host actually wants
-  /// unread == 0 → the form, because there is nothing to read and they are
-  ///               here to ask something
-  ///
-  /// This is why the consumer app needs no separate "Messages" row, and it is
-  /// the reason to copy it rather than keep my three-row version: a reply can
-  /// never end up hidden behind a row the host did not think to tap.
-  ///
-  /// Badge is RED, not brand blue, and capped at 9+ — both taken from
-  /// goouts_app. Red because it is a notification, not decoration.
-  ///
-  /// StreamBuilder defaults to 0 while connecting, so the row never flashes a
-  /// badge and then withdraws it.
-  Widget _contactSupportTile() => StreamBuilder<int>(
-        stream: HostSupportService().unreadCountStream(),
-        builder: (context, snap) {
-          final unread = snap.data ?? 0;
-          return ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.headset_mic_outlined,
-                color: GoOutsColors.primary),
-            title: Text('Contact Support',
-                style: GoogleFonts.inter(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    color: GoOutsColors.navy)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (unread > 0)
-                  Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(12)),
-                    child: Text(unread > 9 ? '9+' : '$unread',
-                        style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white)),
-                  ),
-                const Icon(Icons.chevron_right_rounded,
-                    color: GoOutsColors.onSurfaceVariant, size: 20),
-              ],
-            ),
-            onTap: () {
-              if (unread > 0) {
-                Navigator.of(context)
-                    .pushNamed(HostRoutes.messageCenter, arguments: 1);
-              } else {
-                Navigator.of(context).pushNamed(HostRoutes.contactSupport);
-              }
-            },
-          );
-        },
       );
 
   /// Verification state, said plainly, with the next step.

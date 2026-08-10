@@ -39,6 +39,7 @@ import 'host_collection.dart';
 import 'friendly_error.dart';
 import 'host_bottom_nav.dart';
 import '../../support/host_support_service.dart';
+import 'host_26_notifications_screen.dart';
 
 class HostDashboardScreen extends StatefulWidget {
   const HostDashboardScreen({super.key});
@@ -168,13 +169,13 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
           // Was a bare Icon — decoration that looked like a button. All of
           // these now go somewhere.
           _messagesAction(),
-          IconButton(
-            tooltip: 'Notification settings',
-            icon: const Icon(Icons.notifications_none,
-                color: GoOutsColors.navy),
-            onPressed: () =>
-                Navigator.of(context).pushNamed(HostRoutes.notifications),
-          ),
+          // The bell opens the FEED, not the toggles.
+          //
+          // It used to open notification preferences — a page of switches. In
+          // goouts_app a bell with a red count means "things happened, come
+          // and look", and that is what people expect. The toggles now live
+          // under Settings where a preference belongs.
+          _notificationsAction(),
           IconButton(
             tooltip: 'Your profile',
             icon: const Icon(Icons.account_circle_outlined,
@@ -805,6 +806,55 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
     return '$f – $t';
   }
 
+
+  // ── NOTIFICATIONS BELL ───────────────────────────────────────────────────
+  //
+  // Same badge treatment as the messages icon beside it. Count comes from
+  // hostUnreadNotificationsStream, which counts in Dart rather than with a
+  // where clause — see the note on that function for why.
+  Widget _notificationsAction() => StreamBuilder<int>(
+        stream: hostUnreadNotificationsStream(),
+        builder: (context, snap) {
+          final n = snap.data ?? 0;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              IconButton(
+                tooltip: 'Notifications',
+                icon: const Icon(Icons.notifications_none,
+                    color: GoOutsColors.navy),
+                onPressed: () => Navigator.of(context)
+                    .pushNamed(HostRoutes.notificationFeed),
+              ),
+              if (n > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: GoOutsColors.error,
+                      borderRadius: BorderRadius.circular(10),
+                      border:
+                          Border.all(color: GoOutsColors.surface, width: 1.5),
+                    ),
+                    constraints:
+                        const BoxConstraints(minWidth: 17, minHeight: 17),
+                    child: Text(
+                      n > 9 ? '9+' : '$n',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      );
   // ── MESSAGES ─────────────────────────────────────────────────────────────
   //
   // Badge count comes from HostSupportService.unreadCountStream(), the same

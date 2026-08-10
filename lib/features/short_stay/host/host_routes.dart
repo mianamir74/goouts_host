@@ -29,6 +29,8 @@ import '../../support/host_support_screens.dart';
 import '../../auth/host_change_pin_screen.dart';
 import '../../support/host_contact_support_screen.dart';
 import '../../support/host_message_center_screen.dart';
+import 'host_25_settings_screen.dart';
+import 'host_26_notifications_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Short Stay HOST routing.
@@ -108,6 +110,8 @@ class HostRoutes {
   static const changePin      = '/host/profile/pin';
   static const contactSupport = '/host/support/contact';
   static const messageCenter  = '/host/messages/all';
+  static const settings       = '/host/settings';
+  static const notificationFeed = '/host/notifications';
   static const notifications  = '/host/settings/notifications';
   static const profile        = '/host/profile';
 
@@ -120,7 +124,8 @@ class HostRoutes {
     calendar, requests, pricingAlert, booking, preArrival,
     makeClaim, claimStatus, claimDetails,
     earnings, analytics, messaging, help, notifications, profile,
-    messages, changePin, contactSupport, messageCenter,
+    messages, changePin, contactSupport, messageCenter, settings,
+    notificationFeed,
   };
 
   static bool owns(String? name) => name != null && _all.contains(name);
@@ -161,6 +166,8 @@ class HostRoutes {
           changePin      => const HostChangePinScreen(),
           contactSupport => const HostContactSupportScreen(),
           messageCenter  => const HostMessageCenterScreen(),
+          settings       => const HostSettingsScreen(),
+          notificationFeed => const HostNotificationsScreen(),
           notifications  => const NotificationSettingsScreen(),
           profile        => const HostProfileScreen(),
 

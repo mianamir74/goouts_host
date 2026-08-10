@@ -482,34 +482,16 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-        // ── SEE PREVIOUS CONVERSATIONS. ADDED 9 August 2026. ─────────────
+        // Messages used to have a button here. It was the WRONG PLACE.
         //
-        // Contact support below always worked; there was no way to read the
-        // REPLY. A host asked a question, an admin answered in the panel, and
-        // the answer had nowhere to appear.
+        // A host who had been sent a message looked in Profile, found no
+        // Messages row, and reported that our replies were not arriving.
+        // They were — buried behind the FAQ page. Nobody opens a help
+        // article to check their inbox.
         //
-        // Placed ABOVE Contact support on purpose: someone arriving here has
-        // usually asked already, and sending a second ticket for a question
-        // that has been answered wastes their time and the admin's.
-        OutlinedButton.icon(
-          onPressed: () =>
-              Navigator.of(context)
-                  .pushNamed(HostRoutes.messageCenter, arguments: 1),
-          icon: const Icon(Icons.forum_outlined, size: 19),
-          label: Text(
-            'Your messages',
-            style: GoogleFonts.inter(
-                fontSize: 15, fontWeight: FontWeight.w700),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: GoOutsColors.primary,
-            side: const BorderSide(color: GoOutsColors.primary),
-            minimumSize: const Size(double.infinity, 50),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        const SizedBox(height: 10),
+        // Messages now sits on the Profile, directly under Notifications,
+        // exactly where goouts_app puts it. This screen keeps only what it
+        // is for: answers, and a way to ask if none of them fit.
         ElevatedButton.icon(
           // Was onPressed: () {}. Opens the same sheet the sign-in screen
           // uses, which writes a real ticket to support_requests and appears
