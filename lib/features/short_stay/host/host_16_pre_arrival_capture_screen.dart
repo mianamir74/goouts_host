@@ -154,6 +154,9 @@ class _HostPreArrivalCaptureScreenState
       },
     );
     if (reason == null || _bookingId == null) return;
+    // The dialog above is an await. If this screen was popped while it was
+    // open, setState here would throw on a disposed State.
+    if (!mounted) return;
 
     setState(() => _busyRoom = room);
     try {

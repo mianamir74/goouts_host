@@ -342,6 +342,25 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
           ),
         ]),
 
+        // ── KYC BANNER, MATCHING goouts_app's _buildKycBanner ────────────
+        //
+        // ADDED 10 August 2026. The host profile listed the verified fields as
+        // read-only text but never said what STATE the account was in. The
+        // consumer app has a colour-coded banner for exactly this, and profile
+        // is where someone goes to answer "am I approved?"
+        //
+        // Three states, three colours, each with the next action written out —
+        // green verified, amber in progress, red not approved. Same three
+        // fields and same order of authority as the dashboard hero,
+        // host_home_screen, and requireVerifiedHost() on the server.
+        _kycBanner(kyc, approved),
+        const SizedBox(height: 8),
+
+        _section('Security', children: <Widget>[
+          _tile(Icons.lock_reset_rounded, 'Change PIN',
+              () => Navigator.of(context).pushNamed(HostRoutes.changePin)),
+        ]),
+
         _section('Account', children: <Widget>[
           _tile(Icons.notifications_none_rounded, 'Notifications',
               () => Navigator.of(context)
@@ -522,6 +541,104 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
           );
         },
       );
+
+  /// Verification state, said plainly, with the next step.
+  ///
+  /// Deliberately NOT a link to re-verify. KYC happens once at registration
+  /// and the decision is the admin's or the engine's — offering "verify again"
+  /// here would let a host resubmit after approval and desync the record from
+  /// the decision that was made on it.
+  Widget _kycBanner(String kyc, bool approved) {
+    final rejected = kyc == 'rejected';
+
+    final (Color bg, Color line, Color tone, IconData icon, String title,
+            String body) =
+        switch ((approved, rejected)) {
+      (true, _) => (
+          const Color(0xFFEDF7F1),
+          GoOutsColors.success,
+          GoOutsColors.success,
+          Icons.verified_user_rounded,
+          'You are verified',
+          'Your listings can go live and guests can book them.',
+        ),
+      (_, true) => (
+          const Color(0xFFFEF2F2),
+          GoOutsColors.error,
+          GoOutsColors.error,
+          Icons.gpp_bad_outlined,
+          'Identity check not approved',
+          'We could not verify you from what was submitted. Contact support '
+              'and we will tell you exactly what is needed.',
+        ),
+      _ => (
+          const Color(0xFFFFF8E7),
+          GoOutsColors.warning,
+          GoOutsColors.warning,
+          Icons.hourglass_top_rounded,
+          'Verification in progress',
+          'You can add a property and prepare your listing now. GoOuts must '
+              'verify you before guests can see it.',
+        ),
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: line.withValues(alpha: 0.40)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, size: 20, color: tone),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: GoOutsColors.navy,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: GoogleFonts.inter(
+                    color: GoOutsColors.body,
+                    fontSize: 12.5,
+                    height: 1.45,
+                  ),
+                ),
+                if (rejected) ...<Widget>[
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => showPreAuthSupportSheet(context,
+                        accountType: 'business'),
+                    child: Text(
+                      'Contact support',
+                      style: GoogleFonts.inter(
+                        color: GoOutsColors.error,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _notice(String text) => Center(
         child: Padding(

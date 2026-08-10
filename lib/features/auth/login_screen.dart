@@ -32,6 +32,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'services/auth_service.dart';
 import 'widgets/pre_auth_support_sheet.dart';
 import '../common/goouts_sheet.dart';
@@ -271,7 +272,75 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     final fullPhone =
         '+44${number.startsWith('0') ? number.substring(1) : number}';
+
+    // ── ⚠ PIN SIGN-IN. RESTORED 10 August 2026. I HAD BROKEN THIS. ─────────
+    //
+    // When I replaced this screen with goouts_app's, PIN authentication went
+    // with it. The consumer version collects a PIN, checks it is four digits,
+    // then sends an OTP and passes the PIN along as a route argument for some
+    // later screen to verify. The host OTP screen has no PIN handling at all,
+    // and my rewiring dropped the argument — so the PIN box was theatre. Any
+    // four digits passed, everyone got an SMS, and the field checked nothing.
+    //
+    // That is worse than the screen it replaced, in three ways: it cost an SMS
+    // on every sign-in, it was slower, and it presented a security control
+    // that did nothing.
+    //
+    // A host's PIN is NOT a Firestore hash like the consumer's. Registration
+    // links an EmailAuthProvider credential using a synthetic address derived
+    // from the phone number, so the PIN IS the Firebase Auth password. Signing
+    // in is therefore a real signInWithEmailAndPassword, and a wrong PIN is
+    // rejected by Firebase rather than by us.
+    //
+    // OTP remains the fallback: no linked credential, or a forgotten PIN,
+    // falls through to the SMS path below.
+    final String emailForAuth =
+        '${fullPhone.replaceAll('+', '').replaceAll(' ', '')}@goouts.app';
+
     setState(() => _isLoading = true);
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailForAuth,
+        password: pin,
+      );
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      // Straight in. No SMS, no OTP screen, and no AuthFlowGuard — there is no
+      // verification journey to protect.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const HostHomeScreen()),
+        (_) => false,
+      );
+      return;
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      // Only 'user-not-found' falls through to OTP — that is a host who
+      // registered before the credential was linked, and sending them a code
+      // is the right recovery. A WRONG PIN must NOT silently send an SMS:
+      // that would charge us for every typo and teach hosts the PIN is
+      // optional.
+      if (e.code != 'user-not-found') {
+        setState(() => _isLoading = false);
+        GoOutsSheet.error(
+          context,
+          title: 'Login Failed',
+          message: switch (e.code) {
+            'wrong-password' || 'invalid-credential' =>
+              'Incorrect PIN. Try again, or tap "Forgot PIN?" to reset it by '
+                  'text message.',
+            'too-many-requests' =>
+              'Too many attempts. Please wait a moment and try again.',
+            _ => e.message ?? 'Something went wrong. Please try again.',
+          },
+        );
+        return;
+      }
+      // user-not-found — continue to the OTP path below.
+    } catch (_) {
+      // Network or anything unexpected: fall through to OTP rather than
+      // stranding someone who cannot sign in.
+    }
+
     await _authService.sendOtp(
       phoneNumber: fullPhone,
       onCodeSent: (verificationId, resendToken) {

@@ -234,24 +234,128 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
             .toString()
             .trim();
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              name.isEmpty ? partOfDay : '$partOfDay, $name',
-              style: GoogleFonts.inter(
-                color: GoOutsColors.navy,
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
+        // ── HERO CARD. Polished 10 August 2026. ──────────────────────────
+        //
+        // Was two lines of plain text on the page background. The screen had
+        // no anchor and no colour, so it read as a settings list rather than
+        // a dashboard.
+        //
+        // The gradient is navy → primary, the same pair the splash and the
+        // sign-in screens use, so opening the app feels continuous.
+        //
+        // ⚠ THE VERIFICATION CHIP IS THE POINT, NOT THE DECORATION.
+        //
+        // Whether a host is verified decides whether createStayListing will
+        // accept anything they do. Before this, that fact lived only on the
+        // home screen and inside a server error message — a host could fill in
+        // eight wizard screens and be refused at the last one. Now it is the
+        // first thing on the dashboard, with the next step written next to it.
+        //
+        // Same three fields, same order of authority, as host_home_screen and
+        // requireVerifiedHost() on the server. If this list changes, those
+        // change.
+        final kyc = (d['kycStatus'] ??
+                d['businessProfileVerificationStatus'] ??
+                d['status'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final approved = kyc == 'approved' || kyc == 'verified';
+        final rejected = kyc == 'rejected';
+
+        final (String chipText, IconData chipIcon, Color chipColour) = switch (
+            (approved, rejected)) {
+          (true, _) => ('Verified', Icons.verified_rounded, GoOutsColors.success),
+          (_, true) => (
+              'Not approved',
+              Icons.cancel_outlined,
+              GoOutsColors.error
+            ),
+          _ => (
+              'Verification in progress',
+              Icons.hourglass_top_rounded,
+              GoOutsColors.warning
+            ),
+        };
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[GoOutsColors.navy, GoOutsColors.teal],
+            ),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                partOfDay,
+                style: GoogleFonts.inter(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'An overview of your hosting.',
-              style:
-                  GoogleFonts.inter(color: GoOutsColors.body, fontSize: 15),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                name.isEmpty ? 'Welcome back' : name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w800,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.22)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(chipIcon, size: 15, color: chipColour),
+                    const SizedBox(width: 7),
+                    Text(
+                      chipText,
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!approved) ...<Widget>[
+                const SizedBox(height: 12),
+                Text(
+                  rejected
+                      ? 'Your identity check was not approved. Contact support '
+                          'and we will explain what is needed.'
+                      : 'You can build a listing now. GoOuts must verify you '
+                          'before guests can see it.',
+                  style: GoogleFonts.inter(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 12.5,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ],
+          ),
         );
       },
     );
@@ -293,6 +397,8 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
                   child: _statCard(
                     'LIVE PROPERTIES',
                     snap.hasData ? '$live' : '—',
+                    icon: Icons.holiday_village_rounded,
+                    accent: GoOutsColors.success,
                     sub: live == 0
                         ? 'None visible to guests yet'
                         : 'Visible to guests',
@@ -303,6 +409,8 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
                   child: _statCard(
                     'AWAITING APPROVAL',
                     snap.hasData ? '$drafts' : '—',
+                    icon: Icons.pending_actions_rounded,
+                    accent: GoOutsColors.warning,
                     sub: drafts == 0
                         ? 'Nothing pending'
                         : 'Being checked by GoOuts',
@@ -314,6 +422,8 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
             _statCard(
               'EARNINGS',
               'Not yet available',
+              icon: Icons.payments_outlined,
+              accent: GoOutsColors.onSurfaceVariant,
               sub: 'Payments are not live. There is nothing to report yet.',
               muted: true,
             ),
@@ -323,29 +433,59 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
     );
   }
 
+  /// A single figure, with an icon chip to give the card a focal point.
+  ///
+  /// [accent] tints only the icon, never the number. A green "2" and an amber
+  /// "1" would imply one is good and the other bad, when both are just counts
+  /// — and the moment a number carries a judgement, someone acts on the colour
+  /// instead of reading the label.
   Widget _statCard(String label, String value,
-      {String? sub, bool muted = false}) {
+      {String? sub,
+      bool muted = false,
+      IconData? icon,
+      Color accent = GoOutsColors.primary}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: GoOutsColors.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: GoOutsColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: GoOutsColors.onSurfaceVariant,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-            ),
+          Row(
+            children: <Widget>[
+              if (icon != null) ...<Widget>[
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(icon, size: 16, color: accent),
+                ),
+                const SizedBox(width: 9),
+              ],
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: GoOutsColors.onSurfaceVariant,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             value,
             style: GoogleFonts.inter(
@@ -543,34 +683,64 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: GoOutsColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: GoOutsColors.border),
+        // ── A GRID, NOT A LIST. Polished 10 August 2026. ─────────────────
+        //
+        // Six identical rows with an icon and a chevron is a settings menu,
+        // and it made the dashboard look like one. A 2-column grid of cards
+        // gives each destination equal visual weight and halves the vertical
+        // space, so "Manage" and the booking requests above it both fit on a
+        // phone without scrolling.
+        //
+        // Same shape as the Quick Help grid on the FAQ screen, deliberately —
+        // one grid pattern across the app rather than two.
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 1.55,
           ),
-          child: Column(
-            children: <Widget>[
-              for (int i = 0; i < items.length; i++) ...<Widget>[
-                ListTile(
-                  leading: Icon(items[i].icon, color: GoOutsColors.primary),
-                  title: Text(
-                    items[i].label,
-                    style: GoogleFonts.inter(
-                        color: GoOutsColors.navy,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600),
+          itemCount: items.length,
+          itemBuilder: (context, i) => InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => Navigator.of(context).pushNamed(items[i].route),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: GoOutsColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: GoOutsColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: GoOutsColors.tint,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(items[i].icon,
+                        size: 19, color: GoOutsColors.primary),
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded,
-                      color: GoOutsColors.onSurfaceVariant),
-                  onTap: () =>
-                      Navigator.of(context).pushNamed(items[i].route),
-                ),
-                if (i != items.length - 1)
-                  const Divider(
-                      height: 1, indent: 56, color: GoOutsColors.border),
-              ],
-            ],
+                  Text(
+                    items[i].label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: GoOutsColors.navy,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 14),

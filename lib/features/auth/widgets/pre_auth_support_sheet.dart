@@ -1,5 +1,6 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:goouts_host/features/common/goouts_sheet.dart';
 
@@ -49,6 +50,65 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
   final _msgCtrl   = TextEditingController();
   final _formKey   = GlobalKey<FormState>();
 
+  // ── SIGNED-IN HOSTS. Added 10 August 2026. ────────────────────────────────
+  //
+  // This sheet was written for the PRE-authentication case — the sign-in
+  // screen, where nobody is logged in and there is no record to read. It is
+  // now also opened from Profile and the FAQ screen, where the host IS signed
+  // in, and it was still asking them to type their own name and phone number.
+  //
+  // Worse than the retyping: it wrote uid: '' and preAuthTicket: true
+  // regardless. So a ticket raised from Profile by a fully verified host
+  // arrived in the admin panel labelled as a pre-login enquiry from nobody,
+  // and getMyTickets() could only find it by matching the phone number they
+  // happened to type. Get the number slightly wrong — spaces, +44 vs 07 — and
+  // the host would never see the reply to their own ticket.
+  //
+  // So: when signed in, prefill from /stay_hosts and stamp the real uid.
+  User? get _user => FirebaseAuth.instance.currentUser;
+  bool get _isSignedIn => _user != null;
+
+  /// True once the profile read has finished, so the fields are not shown as
+  /// editable-and-empty for the half second before they fill.
+  bool _prefilling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isSignedIn) _prefillFromProfile();
+  }
+
+  Future<void> _prefillFromProfile() async {
+    setState(() => _prefilling = true);
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection(_sourceCollection)
+          .doc(_user!.uid)
+          .get();
+      final d = snap.data() ?? const <String, dynamic>{};
+      if (!mounted) return;
+      setState(() {
+        _nameCtrl.text = (d['legalBusinessName'] ??
+                d['fullName'] ??
+                d['contactPersonName'] ??
+                '')
+            .toString()
+            .trim();
+        _phoneCtrl.text =
+            (d['phoneNumber'] ?? _user?.phoneNumber ?? '').toString().trim();
+        _prefilling = false;
+      });
+    } catch (_) {
+      // A failed read must never block someone asking for help. Fall back to
+      // the auth phone number and let them type the rest.
+      if (!mounted) return;
+      setState(() {
+        _phoneCtrl.text = _user?.phoneNumber ?? '';
+        _prefilling = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -83,8 +143,10 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
       final name    = _nameCtrl.text.trim();
 
       await ref.set({
-        'uid':                '',
-        'preAuthTicket':      true,
+        // The real uid when signed in, so the host can find this ticket and
+        // read the reply. '' only when genuinely pre-authentication.
+        'uid':                _user?.uid ?? '',
+        'preAuthTicket':      !_isSignedIn,
         'fullName':           name,
         'firstName':          name.split(' ').first,
         'surname':            name.contains(' ')
@@ -97,7 +159,10 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
         'category':           _selectedTopic,
         'categoryLabel':      topicLabel,
         'subTopic':           '',
-        'subject':            'Pre-login: $topicLabel',
+        // 'Pre-login:' only when it actually is. A verified host raising a
+        // ticket from Profile was getting every subject prefixed "Pre-login",
+        // which tells the admin the opposite of the truth.
+        'subject':            _isSignedIn ? topicLabel : 'Pre-login: $topicLabel',
         'message':            _msgCtrl.text.trim(),
         'status':             'new',
         'priority':           _selectedTopic == 'account_suspended' ? 'high' : 'medium',
@@ -105,8 +170,20 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
         'referralCode':       '',
         'lastMessage':        _msgCtrl.text.trim(),
         'lastMessageAt':      FieldValue.serverTimestamp(),
-        'lastMessageBy':      'driver',
+        // ── ⚠ FIELD NAMES. Corrected 10 August 2026. ────────────────────
+        //
+        // This sheet was written for driver_app and still spoke its dialect:
+        // lastMessageBy 'driver' and unreadByDriver. host_support_service
+        // reads unreadByUser — so a ticket raised HERE would never light the
+        // unread badge on Profile, and the host would never learn support had
+        // replied. Same class of drift as the FAQ cat/q/a and kycStatus bugs.
+        //
+        // BOTH unread keys are written. The admin panel reads unreadByDriver
+        // for driver tickets and unreadByUser for the rest; writing one would
+        // fix this app and quietly break that one.
+        'lastMessageBy':      'user',
         'unreadByAdmin':      true,
+        'unreadByUser':       false,
         'unreadByDriver':     false,
         'adminReply':         '',
         'adminRepliedBy':     '',
@@ -119,7 +196,15 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
       });
 
       await ref.collection('messages').add({
-        'sender':     'driver',
+        // 'user', not 'driver', and senderType alongside it.
+        //
+        // host_support_screens decides which side of the thread a bubble sits
+        // on with `senderType ?? sender`. Written as 'driver' this message —
+        // the host's own — rendered LEFT-aligned and labelled "GoOuts
+        // Support", so a host opening their ticket saw their own words
+        // attributed to us.
+        'sender':     'user',
+        'senderType': 'user',
         'senderName': name,
         'text':       _msgCtrl.text.trim(),
         'imageUrl':   '',
@@ -190,6 +275,21 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
     ],
   );
 
+  /// Small caps label above each field.
+  ///
+  /// The sheet previously relied on hint text alone, which vanishes the moment
+  /// someone starts typing — so halfway through the form the fields have no
+  /// labels at all and you cannot tell which box you are in.
+  static Widget _fieldLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6, left: 2),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: _grey,
+                letterSpacing: 0.6)),
+      );
+
   Widget _buildForm() => Form(
     key: _formKey,
     child: SingleChildScrollView(
@@ -225,69 +325,145 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
                     style: TextStyle(fontSize: 12, color: _grey)),
               ],
             )),
+            // ── ⚠ THE WAY OUT. Added 10 August 2026. ──────────────────────
+            //
+            // Reported: "there is no back button to cancel and return back,
+            // there is only one way — the user has to complete the form".
+            //
+            // That reading was right in practice. The sheet is technically
+            // dismissible — showModalBottomSheet defaults isDismissible to
+            // true, so the barrier and a downward swipe both work — but with
+            // isScrollControlled: true and the keyboard up, the sheet fills
+            // the screen and there is no barrier left to tap. The only
+            // Navigator.pop in the whole file was the Done button AFTER
+            // submitting.
+            //
+            // So the only visible exit was to send a support ticket you did
+            // not want to send. A grey 4px drag handle is not an exit anyone
+            // reads as one.
+            //
+            // An explicit X, always visible, above the keyboard.
+            IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close_rounded, color: _grey, size: 22),
+              tooltip: 'Close',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            ),
           ]),
           const SizedBox(height: 16),
 
-          // Topic chips
+          // ── Topic chips ────────────────────────────────────────────────
+          //
+          // A selected chip now FILLS with blue and shows a tick, rather than
+          // an 8%-alpha tint with a slightly thicker border. The old pair was
+          // nearly indistinguishable at arm's length, so people re-tapped
+          // chips unsure whether the first tap registered.
           const Text('What\'s the issue?',
               style: TextStyle(fontSize: 13,
-                  fontWeight: FontWeight.w600, color: _grey)),
-          const SizedBox(height: 8),
+                  fontWeight: FontWeight.w700, color: _grey)),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8, runSpacing: 8,
             children: _topics.map((t) {
               final bool sel = _selectedTopic == t['value'];
               return GestureDetector(
                 onTap: () => setState(() => _selectedTopic = t['value']),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                      horizontal: 14, vertical: 9),
                   decoration: BoxDecoration(
-                    color: sel ? _blue.withValues(alpha: 0.08) : _bg,
+                    color: sel ? _blue : _bg,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: sel ? _blue : _border,
-                        width: sel ? 1.5 : 1.0),
+                        color: sel ? _blue : _border, width: 1),
                   ),
-                  child: Text(t['label']!,
-                      style: TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w600,
-                          color: sel ? _blue : _dark)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (sel) ...[
+                        const Icon(Icons.check_rounded,
+                            size: 14, color: Colors.white),
+                        const SizedBox(width: 5),
+                      ],
+                      Text(t['label']!,
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: sel ? Colors.white : _dark)),
+                    ],
+                  ),
                 ),
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          // Name
+          // ── Name + phone ───────────────────────────────────────────────
+          //
+          // Prefilled from /stay_hosts when signed in. Left EDITABLE on
+          // purpose: the number on the account may be the very thing that is
+          // wrong ("Wrong phone number used" is one of the topics above), so
+          // locking these would block the one enquiry that needs them changed.
+          if (_isSignedIn) ...[
+            Row(
+              children: [
+                Icon(_prefilling
+                        ? Icons.hourglass_top_rounded
+                        : Icons.check_circle_rounded,
+                    size: 14,
+                    color: _prefilling ? _grey : const Color(0xFF16A34A)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _prefilling
+                        ? 'Getting your details…'
+                        : 'Filled in from your account. Change them if needed.',
+                    style: const TextStyle(fontSize: 11.5, color: _grey),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          _fieldLabel('YOUR NAME'),
           TextFormField(
             controller: _nameCtrl,
+            enabled: !_prefilling,
             textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
             decoration: _inputDec('Your full name'),
             validator: (v) => (v == null || v.trim().isEmpty)
                 ? 'Name is required' : null,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
 
-          // Phone
+          _fieldLabel('PHONE NUMBER'),
           TextFormField(
             controller: _phoneCtrl,
+            enabled: !_prefilling,
             keyboardType: TextInputType.phone,
-            decoration: _inputDec('Phone number (e.g. +447400123456)'),
+            textInputAction: TextInputAction.next,
+            decoration: _inputDec('e.g. 07400 123456'),
             validator: (v) => (v == null || v.trim().isEmpty)
                 ? 'Phone number is required' : null,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
 
           // Message
+          _fieldLabel('WHAT HAPPENED?'),
           TextFormField(
             controller: _msgCtrl,
             maxLines: 4,
-            decoration: _inputDec('Describe your issue...'),
+            textCapitalization: TextCapitalization.sentences,
+            decoration: _inputDec(
+                'Tell us what went wrong and we will look into it.'),
             validator: (v) => (v == null || v.trim().isEmpty)
                 ? 'Please describe your issue' : null,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // Submit
           SizedBox(
