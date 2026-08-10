@@ -8,7 +8,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../home/host_home_screen.dart';
+// host_home_screen import removed 10 August 2026. Registration no longer ends
+// here — it hands off to HostCreateProfileScreen for the profile picture and
+// photo ID, and THAT screen finishes at the home screen.
+//
 // terms_and_conditions_screen import removed 8 August 2026 with the tick box.
 // The only thing that used it here was _openTermsAndConditions, and the terms
 // are now shown from the sign-up screen instead — which reads them from
@@ -17,6 +20,8 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_host/features/common/goouts_sheet.dart';
 
 import '../short_stay/host/host_collection.dart';
+import 'host_create_profile_screen.dart';
+
 class BusinessRegistrationScreen extends StatefulWidget {
   const BusinessRegistrationScreen({
     super.key,
@@ -784,16 +789,19 @@ class _BusinessRegistrationScreenState
         barrierDismissible: false,
         builder: (BuildContext dialogContext) {
           return AlertDialog(
-            title: const Text('Registration Completed'),
+            title: const Text('Details received'),
             content: const SingleChildScrollView(
               child: Text(
-                'Thanks for joining GoOuts.\n\nYour personal details, business details, address, and selfie have been submitted successfully.',
+                'Thanks. Your personal details, business details, address and '
+                'selfie are saved.\n\nOne more step: a profile picture and a '
+                'photo ID, which the law requires us to hold before you can '
+                'take bookings.',
               ),
             ),
             actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('OK'),
+                child: const Text('Continue'),
               ),
             ],
           );
@@ -804,9 +812,28 @@ class _BusinessRegistrationScreenState
         return;
       }
 
+      // ── ⚠ GOES TO KYC, NOT STRAIGHT HOME. Changed 10 August 2026. ────────
+      //
+      // This used to push HostHomeScreen and finish. HostCreateProfileScreen
+      // was written on 9 August and committed in build 10, and NOTHING
+      // NAVIGATED TO IT — it shipped as dead code, so a host saw no change at
+      // all and registration ended with no identity document on file.
+      //
+      // That matters beyond a missing screen. The auto-KYC engine weights
+      // document quality at 0.50 of the score; with no document the ceiling is
+      // 0.50 against a 0.65 manual-review floor. Until this screen runs, every
+      // host is unverifiable by anything except an admin doing it by hand.
+      //
+      // pushAndRemoveUntil, not push: the eight registration screens must not
+      // stay on the stack. Back from here should not walk a host through a
+      // form they have already submitted, and a second submit would write the
+      // record twice.
+      //
+      // HostCreateProfileScreen itself ends at HostHomeScreen, so the journey
+      // still finishes in the same place.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
-          builder: (_) => const HostHomeScreen(),
+          builder: (_) => const HostCreateProfileScreen(),
         ),
         (Route<dynamic> route) => false,
       );

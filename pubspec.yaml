@@ -114,6 +114,9 @@ flutter:
     - assets/logo/goouts_logo_white.png
     - assets/logo/business_code.png
     - assets/logo/role_icon.png
+    # Shared with goouts_app so the sign-in journey looks the same
+    # in every GoOuts app. Copied 10 August 2026.
+    - assets/images/signup_hero.webp
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

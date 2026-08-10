@@ -346,21 +346,28 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
           _tile(Icons.notifications_none_rounded, 'Notifications',
               () => Navigator.of(context)
                   .pushNamed(HostRoutes.notifications)),
-          _tile(Icons.help_outline_rounded, 'Help centre',
+          // ── FAQ + CONTACT SUPPORT, MATCHING goouts_app EXACTLY ───────────
+          //
+          // CHANGED 10 August 2026. This was three rows — Help centre,
+          // Messages, Contact support. goouts_app uses TWO, and its shape is
+          // better, so the host app now copies it rather than inventing a
+          // third arrangement:
+          //
+          //   FAQ              Icons.help_outline_rounded
+          //   Contact Support  Icons.headset_mic_outlined, with a RED unread
+          //                    badge, capped at 9+
+          //
+          // The clever part is the routing, and it is worth keeping: ONE row
+          // does both jobs. If support has replied, it opens the conversation.
+          // If not, it opens the form to start one. A host never has to work
+          // out which of two similar rows they want, and a waiting reply is
+          // never buried behind a row labelled something else.
+          //
+          // Named 'FAQ' rather than 'Help centre' deliberately — the same word
+          // in every GoOuts app, for the same screen.
+          _tile(Icons.help_outline_rounded, 'FAQ',
               () => Navigator.of(context).pushNamed(HostRoutes.help)),
-          // ── MESSAGES. ADDED 9 August 2026, AND IT WAS THE MISSING HALF. ──
-          //
-          // Contact support below has always worked — it writes a real ticket
-          // that lands in the admin panel under Support → Hosts. What did not
-          // exist was any way to READ THE REPLY. An admin answered, and the
-          // host never saw it.
-          //
-          // The badge streams unreadByUser. Without it a host has no reason to
-          // open this screen and would only find the answer by chance.
-          _messagesTile(),
-          _tile(Icons.headset_mic_outlined, 'Contact support',
-              () => showPreAuthSupportSheet(context,
-                  accountType: 'business')),
+          _contactSupportTile(),
         ]),
 
         const SizedBox(height: 8),
@@ -453,59 +460,65 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
         onTap: onTap,
       );
 
-  /// Messages, with a live unread badge.
+  /// Contact Support, with a live unread badge — the goouts_app row, copied.
   ///
-  /// Built separately from _tile because the badge needs a stream and _tile is
-  /// deliberately dumb. StreamBuilder defaults to 0 while connecting, so the
-  /// row never flickers a badge it then removes.
-  Widget _messagesTile() => StreamBuilder<int>(
+  /// ── ONE ROW, TWO DESTINATIONS ────────────────────────────────────────────
+  ///
+  /// unread > 0  → the conversation, because support has already answered and
+  ///               that answer is the thing the host actually wants
+  /// unread == 0 → the form, because there is nothing to read and they are
+  ///               here to ask something
+  ///
+  /// This is why the consumer app needs no separate "Messages" row, and it is
+  /// the reason to copy it rather than keep my three-row version: a reply can
+  /// never end up hidden behind a row the host did not think to tap.
+  ///
+  /// Badge is RED, not brand blue, and capped at 9+ — both taken from
+  /// goouts_app. Red because it is a notification, not decoration.
+  ///
+  /// StreamBuilder defaults to 0 while connecting, so the row never flashes a
+  /// badge and then withdraws it.
+  Widget _contactSupportTile() => StreamBuilder<int>(
         stream: HostSupportService().unreadCountStream(),
         builder: (context, snap) {
           final unread = snap.data ?? 0;
           return ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.forum_outlined,
+            leading: const Icon(Icons.headset_mic_outlined,
                 color: GoOutsColors.primary),
-            title: Text('Messages',
+            title: Text('Contact Support',
                 style: GoogleFonts.inter(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w600,
                     color: GoOutsColors.navy)),
-            subtitle: Text(
-              unread > 0
-                  ? '$unread new ${unread == 1 ? "reply" : "replies"} from support'
-                  : 'Your support conversations',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: unread > 0
-                    ? GoOutsColors.primary
-                    : GoOutsColors.onSurfaceVariant,
-                fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w400,
-              ),
-            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 if (unread > 0)
                   Container(
+                    margin: const EdgeInsets.only(right: 6),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 2),
+                        horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                        color: GoOutsColors.primary,
+                        color: Colors.red,
                         borderRadius: BorderRadius.circular(12)),
-                    child: Text('$unread',
+                    child: Text(unread > 9 ? '9+' : '$unread',
                         style: GoogleFonts.inter(
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w800,
                             color: Colors.white)),
                   ),
-                const SizedBox(width: 6),
                 const Icon(Icons.chevron_right_rounded,
-                    color: GoOutsColors.onSurfaceVariant),
+                    color: GoOutsColors.onSurfaceVariant, size: 20),
               ],
             ),
-            onTap: () =>
-                Navigator.of(context).pushNamed(HostRoutes.messages),
+            onTap: () {
+              if (unread > 0) {
+                Navigator.of(context).pushNamed(HostRoutes.messages);
+              } else {
+                showPreAuthSupportSheet(context, accountType: 'business');
+              }
+            },
           );
         },
       );

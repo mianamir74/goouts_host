@@ -14,8 +14,10 @@ import 'business_referral_code_screen.dart';
 import 'otp_verification_screen.dart';
 import 'widgets/pre_auth_support_sheet.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../short_stay/host/host_collection.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -676,8 +678,23 @@ website.
 
   @override
   Widget build(BuildContext context) {
+    // ── ⚠ RESKINNED 10 August 2026 TO MATCH goouts_app's SIGN-IN. ──────────
+    //
+    // Was a white screen with role_icon.png and black text. goouts_app uses a
+    // full-bleed GoOuts blue field, the "GoOuts" wordmark, a rounded hero
+    // photograph, then white headings — and a host who has also used GoOuts as
+    // a customer should recognise the door they are walking through.
+    //
+    // Only the PRESENTATION changed. Every behaviour underneath is untouched:
+    // returning-user detection, PIN sign-in, Forgot PIN via OTP, AuthFlowGuard,
+    // and the routing to BusinessReferralCodeScreen or HostHomeScreen. That is
+    // deliberate — this screen took roughly twenty builds to get right and none
+    // of that was a styling problem.
+    //
+    // Left-aligned, not centred, because goouts_app is left-aligned and the
+    // two screens sitting side by side would otherwise read as different apps.
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _goOutsBlue,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
@@ -695,35 +712,61 @@ website.
                       width: double.infinity,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Image.asset(
-                            'assets/logo/role_icon.png',
-                            height: 190,
-                            fit: BoxFit.contain,
+                          const SizedBox(height: 8),
+                          Text(
+                            'GoOuts',
+                            style: GoogleFonts.inter(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              height: 1.1,
+                            ),
                           ),
-                          SizedBox(height: 20),
+                          const SizedBox(height: 18),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.asset(
+                              'assets/images/signup_hero.webp',
+                              height: 200,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              // The asset is declared in pubspec and shipped,
+                              // but a missing file must not take the sign-in
+                              // screen down — without this a failed decode
+                              // throws inside build() and nobody can log in.
+                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                            ),
+                          ),
+                          const SizedBox(height: 26),
                           AutoSizeText(
                             _isReturningUser
                                 ? 'Welcome Back!'
-                                : 'Welcome to GoOuts',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 24,
+                                : 'Enter your mobile number',
+                            textAlign: TextAlign.left,
+                            style: GoogleFonts.inter(
+                              fontSize: 30,
                               fontWeight: FontWeight.w800,
-                              color: Colors.black87,
+                              color: Colors.white,
+                              height: 1.15,
                             ),
                           ),
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           AutoSizeText(
+                            // "GoOuts Host", not "GoOuts" — this is the one
+                            // place the two apps deliberately differ, so a host
+                            // can tell at a glance which app they opened.
                             _isReturningUser
-                                ? 'Enter your password to sign back in'
-                                : 'Enter your mobile number to continue',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.black54,
-                              height: 1.5,
-                              fontWeight: FontWeight.w500,
+                                ? 'Welcome back to GoOuts Host.'
+                                : "We'll send you a verification code to get "
+                                    'you started as a host.',
+                            textAlign: TextAlign.left,
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              color: Colors.white.withValues(alpha: 0.85),
+                              height: 1.45,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
                           SizedBox(height: 10),
@@ -968,7 +1011,9 @@ website.
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.black45,
+                              // White-on-blue since the reskin. Was black45,
+                              // which is invisible on the new background.
+                              color: Colors.white.withValues(alpha: 0.75),
                             ),
                           ),
 
@@ -1189,13 +1234,19 @@ website.
                                 context,
                                 accountType: _selectedAccountType,
                               ),
+                              // NOT const. Colors.white70 is a const value;
+                              // Colors.white.withValues(alpha: …) is a method
+                              // call and cannot appear in a const expression —
+                              // which is exactly what the analyzer caught when
+                              // this was reskinned. white70 is the same
+                              // intended weight and keeps the widget const.
                               child: const Text(
                                 'Having trouble? Get help',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.black38,
+                                  color: Colors.white70,
                                   decoration: TextDecoration.underline,
-                                  decorationColor: Colors.black26,
+                                  decorationColor: Colors.white54,
                                 ),
                               ),
                             ),

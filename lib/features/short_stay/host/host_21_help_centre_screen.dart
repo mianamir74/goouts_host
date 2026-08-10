@@ -52,11 +52,169 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
 
+  /// The category currently filtered to. Null shows everything.
+  String? _selectedCategory;
+
+  // ── QUICK HELP, MATCHING goouts_app's FAQ SCREEN ─────────────────────────
+  //
+  // ADDED 10 August 2026. goouts_app's FAQ screen opens with a 2-column grid
+  // of tappable category cards under a "QUICK HELP" heading, then a
+  // "FREQUENT QUESTIONS" list with a dismissable filter chip. This screen had
+  // only a search box and plain category headers, so a host who did not know
+  // what to search for had nothing to press.
+  //
+  // ⚠ THESE LABELS MUST MATCH kShortStayHostFaqCategories IN THE ADMIN PANEL
+  // (admin_panel/lib/data/short_stay_faq_seed.dart). goouts_app has already
+  // been bitten by exactly this: its 'Account Security' tile mapped to a
+  // category name the seed never used, so tapping it always showed an empty
+  // list, and nobody noticed because an empty list looks like "no articles".
+  //
+  // Six of the seven seeded categories are shown. 'Rules and registration' is
+  // reachable through search and the full list below; a 2-column grid wants an
+  // even count, and seven cards leaves a lone card on the last row.
+  static const List<Map<String, dynamic>> _quickHelp = <Map<String, dynamic>>[
+    {'icon': Icons.rocket_launch_outlined, 'label': 'Getting started'},
+    {'icon': Icons.holiday_village_outlined, 'label': 'Your listing'},
+    {'icon': Icons.calendar_month_outlined, 'label': 'Bookings'},
+    {'icon': Icons.luggage_outlined, 'label': 'Arrival and departure'},
+    {'icon': Icons.report_gmailerrorred_outlined, 'label': 'Damage claims'},
+    {'icon': Icons.payments_outlined, 'label': 'Getting paid'},
+  ];
+
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
+
+  Widget _quickHelpGrid() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'QUICK HELP',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: GoOutsColors.onSurfaceVariant,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 10),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1.9,
+            ),
+            itemCount: _quickHelp.length,
+            itemBuilder: (context, i) {
+              final item = _quickHelp[i];
+              final label = item['label'] as String;
+              final active = _selectedCategory == label;
+              return GestureDetector(
+                // Tapping the active card clears the filter, so the card is
+                // its own off switch and a host is never stuck inside one
+                // category wondering where everything else went.
+                onTap: () => setState(
+                    () => _selectedCategory = active ? null : label),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  decoration: BoxDecoration(
+                    color: active ? GoOutsColors.primary : GoOutsColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: active
+                            ? GoOutsColors.primary
+                            : GoOutsColors.border),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: active
+                              ? Colors.white.withValues(alpha: 0.2)
+                              : GoOutsColors.tint,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(item['icon'] as IconData,
+                            color: active ? Colors.white : GoOutsColors.teal,
+                            size: 20),
+                      ),
+                      const SizedBox(height: 7),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: active ? Colors.white : GoOutsColors.navy,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      );
+
+  /// "FREQUENT QUESTIONS" with the dismissable active-category chip, exactly
+  /// as goouts_app does it.
+  Widget _frequentHeader() => Row(
+        children: <Widget>[
+          Text(
+            'FREQUENT QUESTIONS',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: GoOutsColors.onSurfaceVariant,
+              letterSpacing: 1.0,
+            ),
+          ),
+          if (_selectedCategory != null) ...<Widget>[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() => _selectedCategory = null),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: GoOutsColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      _selectedCategory!,
+                      style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: GoOutsColors.primary),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.close_rounded,
+                        size: 12, color: GoOutsColors.primary),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -115,9 +273,19 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
                   );
                 }
 
-                final matched = _query.isEmpty
+                // Two filters, applied in order: the Quick Help category, then
+                // the search text. Category first because a host who has
+                // tapped a card has already narrowed their intent, and
+                // searching inside that narrower set is what they expect.
+                final inCategory = _selectedCategory == null
                     ? all
-                    : all.where((m) {
+                    : all
+                        .where((m) => _str(m['cat']) == _selectedCategory)
+                        .toList();
+
+                final matched = _query.isEmpty
+                    ? inCategory
+                    : inCategory.where((m) {
                         final hay =
                             '${_str(m['q'])} ${_str(m['a'])} ${_str(m['cat'])}'
                                 .toLowerCase();
@@ -125,12 +293,25 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
                       }).toList();
 
                 if (matched.isEmpty) {
-                  return _notice(
-                    'Nothing matches "${_searchCtrl.text.trim()}". Try a '
-                    'different word, or contact support below.',
-                    GoOutsColors.onSurfaceVariant,
-                    Icons.search_off_rounded,
-                  );
+                  // Three different empty states, because "nothing here" for
+                  // three different reasons needs three different next steps.
+                  // A single generic message would leave a host tapping the
+                  // same card again wondering why it is broken.
+                  final String msg;
+                  if (_query.isNotEmpty && _selectedCategory != null) {
+                    msg = 'Nothing in "$_selectedCategory" matches '
+                        '"${_searchCtrl.text.trim()}". Clear the category '
+                        'above to search everything.';
+                  } else if (_query.isNotEmpty) {
+                    msg = 'Nothing matches "${_searchCtrl.text.trim()}". Try a '
+                        'different word, or contact support below.';
+                  } else {
+                    msg = 'No articles under "$_selectedCategory" yet. Tap the '
+                        'card again to see everything, or contact support '
+                        'below.';
+                  }
+                  return _notice(msg, GoOutsColors.onSurfaceVariant,
+                      Icons.search_off_rounded);
                 }
 
                 // Grouped by category, categories in first-seen order so the
@@ -145,6 +326,15 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                   children: <Widget>[
+                    // Quick Help is hidden while searching. goouts_app does the
+                    // same: once someone is typing, a grid of category cards is
+                    // just something between them and their results.
+                    if (_query.isEmpty) ...<Widget>[
+                      _quickHelpGrid(),
+                      const SizedBox(height: 22),
+                    ],
+                    _frequentHeader(),
+                    const SizedBox(height: 10),
                     if (_query.isNotEmpty) ...<Widget>[
                       Text(
                         '${matched.length} '
