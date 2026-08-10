@@ -110,7 +110,18 @@ class HostRoutes {
   static const changePin      = '/host/profile/pin';
   static const contactSupport = '/host/support/contact';
   static const messageCenter  = '/host/messages/all';
-  static const settings       = '/host/settings';
+  // NAMED appSettings, NOT settings, DELIBERATELY.
+  //
+  // onGenerateRoute takes a parameter called `settings` (it is a
+  // RouteSettings — Flutter's own name). A constant called `settings`
+  // is shadowed by it inside that method, so the switch case below
+  // resolved to the PARAMETER and the analyzer rejected it with
+  // constant_pattern_with_non_constant_expression.
+  //
+  // Qualifying it as HostRoutes.settings would also compile, but the
+  // next person to add a route would hit the same trap. A name that
+  // cannot collide is the better fix.
+  static const appSettings    = '/host/settings';
   static const notificationFeed = '/host/notifications';
   static const notifications  = '/host/settings/notifications';
   static const profile        = '/host/profile';
@@ -124,7 +135,7 @@ class HostRoutes {
     calendar, requests, pricingAlert, booking, preArrival,
     makeClaim, claimStatus, claimDetails,
     earnings, analytics, messaging, help, notifications, profile,
-    messages, changePin, contactSupport, messageCenter, settings,
+    messages, changePin, contactSupport, messageCenter, appSettings,
     notificationFeed,
   };
 
@@ -166,7 +177,7 @@ class HostRoutes {
           changePin      => const HostChangePinScreen(),
           contactSupport => const HostContactSupportScreen(),
           messageCenter  => const HostMessageCenterScreen(),
-          settings       => const HostSettingsScreen(),
+          appSettings    => const HostSettingsScreen(),
           notificationFeed => const HostNotificationsScreen(),
           notifications  => const NotificationSettingsScreen(),
           profile        => const HostProfileScreen(),

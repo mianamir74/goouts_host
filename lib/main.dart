@@ -11,6 +11,7 @@ import 'features/short_stay/host/host_routes.dart';
 import 'features/splash/host_splash_screen.dart';
 import 'firebase_options.dart';
 import 'theme/goouts_colors.dart';
+import 'features/auth/fresh_install_guard.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GoOuts Host. Bundle com.goouts.host on BOTH platforms.
@@ -34,6 +35,13 @@ Future<void> main() async {
   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
   await FirebaseCrashlytics.instance
       .setCrashlyticsCollectionEnabled(!kDebugMode);
+
+    // ── SIGN OUT A SESSION THAT SURVIVED A REINSTALL ────────────────────────
+  //
+  // MUST run after Firebase.initializeApp (it needs FirebaseAuth) and BEFORE
+  // runApp (so no screen ever renders for a user who is about to be signed
+  // out). See features/auth/fresh_install_guard.dart for why this exists.
+  await enforceFreshInstallSignOut();
 
   runApp(const GoOutsHostApp());
 }

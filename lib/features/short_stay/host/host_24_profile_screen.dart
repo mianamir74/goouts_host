@@ -525,7 +525,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
               trailing: const Icon(Icons.chevron_right_rounded,
                   color: Colors.grey, size: 20),
               onTap: () =>
-                  Navigator.of(context).pushNamed(HostRoutes.settings),
+                  Navigator.of(context).pushNamed(HostRoutes.appSettings),
             ),
             _divider(),
 
