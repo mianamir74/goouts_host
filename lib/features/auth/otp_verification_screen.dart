@@ -11,11 +11,28 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_host/features/common/goouts_sheet.dart';
 
 import '../short_stay/host/host_collection.dart';
+import 'host_change_pin_screen.dart';
 class OtpVerificationScreen extends StatefulWidget {
   final String verificationId;
   final String phoneNumber;
   final String localMobileNumber;
   final int? resendToken;
+
+  /// True when this OTP came from "Forgot PIN?" rather than a normal sign-in.
+  ///
+  /// ADDED 11 August 2026. The Forgot-PIN flow sent a code, verified it, and
+  /// then dropped the host on the dashboard with their PIN completely
+  /// unchanged. The button says "We'll send a reset code" and the sheet is
+  /// titled "Forgot PIN?", so the host reasonably expects to end up setting a
+  /// new one. Nothing reset. They were simply signed in.
+  ///
+  /// Worse, the host who most needs this is the one with NO pin at all — for
+  /// them the old flow was a loop: cannot sign in with a PIN, use Forgot PIN,
+  /// land on the dashboard, still no PIN, same failure next time.
+  ///
+  /// With this flag we land on Change PIN instead, which knows how to SET a
+  /// first PIN as well as change an existing one.
+  final bool resetPin;
 
   const OtpVerificationScreen({
     super.key,
@@ -23,6 +40,7 @@ class OtpVerificationScreen extends StatefulWidget {
     required this.phoneNumber,
     required this.localMobileNumber,
     required this.resendToken,
+    this.resetPin = false,
   });
 
   @override
@@ -207,6 +225,23 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     AuthFlowGuard.end();
 
     if (businessResult.exists) {
+      // Forgot-PIN journey: finish where the host expected to finish.
+      //
+      // Pushed ON TOP of the dashboard, not instead of it, so closing the PIN
+      // screen leaves them signed in rather than back at login. Someone who
+      // changes their mind should not be punished for it.
+      if (widget.resetPin) {
+        _bc('completeVerification: navigating to Change PIN (reset flow)');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HostHomeScreen()),
+          (route) => false,
+        );
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const HostChangePinScreen()),
+        );
+        _bc('completeVerification: navigation call returned');
+        return;
+      }
       _bc('completeVerification: navigating to HostHomeScreen');
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HostHomeScreen()),

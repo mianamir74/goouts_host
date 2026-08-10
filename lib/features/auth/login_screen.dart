@@ -41,6 +41,7 @@ import 'auth_flow_guard.dart';
 import 'otp_verification_screen.dart';
 import 'signup_screen.dart';
 import '../home/host_home_screen.dart';
+import 'host_change_pin_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -233,6 +234,8 @@ class _LoginScreenState extends State<LoginScreen> {
             phoneNumber: fullPhone,
             localMobileNumber: localNumber,
             resendToken: resendToken,
+            // This code came from "Forgot PIN?" — end on the PIN screen.
+            resetPin: true,
           ),
         ));
       },
@@ -240,9 +243,14 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         setState(() => _isLoading = false);
         AuthFlowGuard.end();
+        // Same destination as the manual path above: signed in, then straight
+        // to the PIN screen, because that is what the host asked for.
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute<void>(builder: (_) => const HostHomeScreen()),
           (_) => false,
+        );
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const HostChangePinScreen()),
         );
       },
       onError: (message) {
@@ -319,15 +327,47 @@ class _LoginScreenState extends State<LoginScreen> {
       // is the right recovery. A WRONG PIN must NOT silently send an SMS:
       // that would charge us for every typo and teach hosts the PIN is
       // optional.
+      // ── WHY invalid-credential IS NOT "wrong PIN" ────────────────────
+      //
+      // FIXED 10 August 2026, reported as "login failed but signup works".
+      //
+      // This used to fall through to OTP on 'user-not-found' only, and map
+      // 'invalid-credential' to "Incorrect PIN". That was written against the
+      // OLD Firebase behaviour.
+      //
+      // Firebase EMAIL ENUMERATION PROTECTION is on by default now. With it
+      // on, signInWithEmailAndPassword NEVER returns user-not-found — an
+      // unknown address and a wrong password BOTH return invalid-credential,
+      // deliberately, so an attacker cannot discover which accounts exist.
+      //
+      // So a host who registered before PIN linking existed — or whose link
+      // silently failed, because _linkEmailPasswordCredential swallows every
+      // error — got "Incorrect PIN" for a PIN they never set, and the OTP
+      // fallback was never reached. Signup worked because it goes straight to
+      // SMS and never touches email/password.
+      //
+      // We cannot tell the two cases apart. That is the whole point of
+      // enumeration protection. So we do NOT guess, and we do NOT silently
+      // send an SMS on every typo — that costs money and teaches hosts the
+      // PIN is optional. We say both possibilities plainly and give one tap
+      // to the text-message route.
       if (e.code != 'user-not-found') {
         setState(() => _isLoading = false);
+        if (e.code == 'invalid-credential' || e.code == 'wrong-password') {
+          GoOutsSheet.error(
+            context,
+            title: 'Could not sign you in',
+            message: 'Either that PIN is wrong, or this account does not '
+                'have a PIN yet.\n\nIf you registered a while ago, tap '
+                '"Forgot PIN?" to get a code by text. Once you are in, you '
+                'can set a PIN from Profile → Settings → Change PIN.',
+          );
+          return;
+        }
         GoOutsSheet.error(
           context,
           title: 'Login Failed',
           message: switch (e.code) {
-            'wrong-password' || 'invalid-credential' =>
-              'Incorrect PIN. Try again, or tap "Forgot PIN?" to reset it by '
-                  'text message.',
             'too-many-requests' =>
               'Too many attempts. Please wait a moment and try again.',
             _ => e.message ?? 'Something went wrong. Please try again.',

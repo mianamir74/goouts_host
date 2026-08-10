@@ -85,7 +85,11 @@ class _GoOutsLoadingOverlayState extends State<GoOutsLoadingOverlay>
                 ),
               ),
               Text(
-                'LEAD',
+                // Was 'LEAD'. This overlay was copied wholesale from driver_app when the
+                // host app was created, and the sub-brand came with it — so a host
+                // verifying their number was shown "GoOuts LEAD" on a full-screen
+                // takeover. Reported from a TestFlight screenshot, 10 August 2026.
+                'HOST',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,

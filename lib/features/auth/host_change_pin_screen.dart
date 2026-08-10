@@ -49,6 +49,24 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
   bool _saving = false;
   String? _error;
 
+  // ── DOES THIS ACCOUNT EVEN HAVE A PIN? ─────────────────────────────────
+  //
+  // ADDED 10 August 2026. This screen assumed one always existed, so it
+  // reauthenticated with the current PIN and called updatePassword.
+  //
+  // Hosts who registered before PIN linking existed — or whose link silently
+  // failed, because _linkEmailPasswordCredential in business_registration
+  // swallows every error — have NO password provider on their account. For
+  // them reauthenticate fails, so they could never set a PIN, so they could
+  // never use PIN sign-in, so every login went through SMS forever.
+  //
+  // With no provider we LINK a credential instead of updating one, and the
+  // "current PIN" field is hidden because there is nothing to type.
+  bool get _hasPin =>
+      FirebaseAuth.instance.currentUser?.providerData
+          .any((p) => p.providerId == 'password') ??
+      false;
+
   @override
   void dispose() {
     _currentCtrl.dispose();
@@ -72,10 +90,11 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
     final current = _currentCtrl.text.trim();
     final next = _newCtrl.text.trim();
     final confirm = _confirmCtrl.text.trim();
+    final setting = !_hasPin; // first-time set, not a change
 
     setState(() => _error = null);
 
-    if (current.length < 4) {
+    if (!setting && current.length < 4) {
       setState(() => _error = 'Enter your current 4-digit PIN.');
       return;
     }
@@ -87,7 +106,7 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
       setState(() => _error = 'The two new PINs do not match.');
       return;
     }
-    if (next == current) {
+    if (!setting && next == current) {
       setState(() => _error = 'That is your current PIN. Choose a new one.');
       return;
     }
@@ -110,15 +129,26 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
       // Reauthenticate with the CURRENT pin, then set the new one. Both steps
       // are required: updatePassword alone throws requires-recent-login for
       // anyone who has not signed in in the last few minutes.
-      await user.reauthenticateWithCredential(
-        EmailAuthProvider.credential(email: email, password: current),
-      );
-      await user.updatePassword(next);
+      if (setting) {
+        // No password provider yet — create one. linkWithCredential is the
+        // only call that works here; updatePassword needs a credential to
+        // already exist, and reauthenticate needs one to check against.
+        await user.linkWithCredential(
+          EmailAuthProvider.credential(email: email, password: next),
+        );
+      } else {
+        await user.reauthenticateWithCredential(
+          EmailAuthProvider.credential(email: email, password: current),
+        );
+        await user.updatePassword(next);
+      }
 
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('PIN changed. Use the new one next time you sign in.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_hasPin
+            ? 'PIN changed. Use the new one next time you sign in.'
+            : 'PIN set. You can sign in with it next time.'),
         backgroundColor: GoOutsColors.success,
       ));
       Navigator.of(context).pop();
@@ -136,6 +166,12 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
           'user-not-found' =>
             'No PIN is set on this account yet. Sign in with a text code '
                 'instead, or contact support.',
+          'provider-already-linked' || 'credential-already-in-use' =>
+            'A PIN already exists on this account. Close this screen and open '
+                'it again.',
+          'requires-recent-login' =>
+            'For security, please sign out and sign in again, then set your '
+                'PIN straight away.',
           _ => e.message ?? 'Could not change your PIN. Please try again.',
         };
       });
@@ -160,7 +196,7 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
           icon: const Icon(Icons.arrow_back, color: GoOutsColors.primary),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Change PIN',
+        title: Text(_hasPin ? 'Change PIN' : 'Set your PIN',
             style: GoogleFonts.inter(
                 color: GoOutsColors.navy,
                 fontSize: 20,
@@ -185,8 +221,12 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Your PIN signs you in without waiting for a text message. '
-                    'Changing it takes effect straight away.',
+                    _hasPin
+                        ? 'Your PIN signs you in without waiting for a text '
+                            'message. Changing it takes effect straight away.'
+                        : 'You do not have a PIN yet, so every sign-in needs a '
+                            'text code. Set one here and you can sign straight '
+                            'in next time.',
                     style: GoogleFonts.inter(
                         fontSize: 13, color: GoOutsColors.body, height: 1.45),
                   ),
@@ -195,15 +235,18 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          _label('CURRENT PIN'),
-          _pinField(_currentCtrl, _obscureCurrent,
-              () => setState(() => _obscureCurrent = !_obscureCurrent)),
-          const SizedBox(height: 18),
-          _label('NEW PIN'),
+          // Nothing to confirm against when no PIN exists yet.
+          if (_hasPin) ...<Widget>[
+            _label('CURRENT PIN'),
+            _pinField(_currentCtrl, _obscureCurrent,
+                () => setState(() => _obscureCurrent = !_obscureCurrent)),
+            const SizedBox(height: 18),
+          ],
+          _label(_hasPin ? 'NEW PIN' : 'CHOOSE A PIN'),
           _pinField(_newCtrl, _obscureNew,
               () => setState(() => _obscureNew = !_obscureNew)),
           const SizedBox(height: 18),
-          _label('CONFIRM NEW PIN'),
+          _label(_hasPin ? 'CONFIRM NEW PIN' : 'CONFIRM PIN'),
           // Shares the new-PIN visibility toggle rather than having its own —
           // two independent eyes on two boxes that must match is fiddly, and
           // people end up comparing one masked field with one visible one.
@@ -251,7 +294,7 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
                       height: 20,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
-                  : Text('Update PIN',
+                  : Text(_hasPin ? 'Update PIN' : 'Set PIN',
                       style: GoogleFonts.inter(
                           fontSize: 15.5,
                           fontWeight: FontWeight.w700,
@@ -259,12 +302,13 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          Center(
-            child: GestureDetector(
-              onTap: () =>
-                  Navigator.of(context).pushNamed(HostRoutes.contactSupport),
-              child: Text(
-                'Forgotten your current PIN?',
+          if (_hasPin)
+            Center(
+              child: GestureDetector(
+                onTap: () =>
+                    Navigator.of(context).pushNamed(HostRoutes.contactSupport),
+                child: Text(
+                  'Forgotten your current PIN?',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   color: GoOutsColors.primary,
