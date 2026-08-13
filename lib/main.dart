@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'features/auth/auth_flow_guard.dart';
 import 'features/home/host_home_screen.dart';
+import 'features/intro/host_intro_screen.dart';
 import 'features/short_stay/host/host_routes.dart';
 import 'features/splash/host_splash_screen.dart';
 import 'firebase_options.dart';
@@ -42,6 +43,19 @@ Future<void> main() async {
   // runApp (so no screen ever renders for a user who is about to be signed
   // out). See features/auth/fresh_install_guard.dart for why this exists.
   await enforceFreshInstallSignOut();
+
+  // ── HAS THIS HOST SEEN THE INTRO? ───────────────────────────────────────
+  //
+  // Read HERE rather than inside the launch coordinator, because the
+  // coordinator is a StreamBuilder and has to decide synchronously. Resolving
+  // a Future in there would show the welcome splash for a frame and then
+  // replace it with the intro, which reads as a glitch on the very first
+  // launch — the one launch where it matters most.
+  //
+  // Must run AFTER enforceFreshInstallSignOut: that clears a session left in
+  // the Keychain by a previous install, and a reinstalled app should get the
+  // intro again.
+  await loadHostIntroSeen();
 
   runApp(const GoOutsHostApp());
 }
@@ -170,7 +184,19 @@ class _HostLaunchCoordinator extends StatelessWidget {
           return const HostHomeScreen();
         }
 
-        // Nobody signed in. Same splash, now with the ways in.
+        // ── NOBODY SIGNED IN ─────────────────────────────────────────────
+        //
+        // First launch gets the six intro screens, which are the only place
+        // that answers "why list here instead of Airbnb". After that — or if
+        // the preference could not be read — straight to the welcome splash.
+        //
+        // The intro marks itself seen and pushReplacement-es to signup or
+        // login, so it never appears twice and never stacks behind them.
+        if (!hostIntroSeen) {
+          return const HostIntroScreen();
+        }
+
+        // Returning, signed out. Same splash, with the ways in.
         return const HostSplashScreen(mode: HostSplashMode.welcome);
       },
     );

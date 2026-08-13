@@ -117,6 +117,12 @@ flutter:
     # Shared with goouts_app so the sign-in journey looks the same
     # in every GoOuts app. Copied 10 August 2026.
     - assets/images/signup_hero.webp
+    # The whole folder, not six more filenames. The intro illustrations land
+    # here (host_intro1_illustration.webp .. host_intro6_illustration.webp) and
+    # listing a directory means adding or re-exporting one never needs a
+    # pubspec edit — a missing line here fails silently at runtime as a blank
+    # image, which is exactly the kind of bug nobody thinks to look for.
+    - assets/images/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
