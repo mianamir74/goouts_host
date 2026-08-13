@@ -30,6 +30,21 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!--
+            ML Kit face model, installed with the app rather than downloaded
+            on first use.
+
+            Without this line Play Services fetches the model the first time a
+            host takes their KYC selfie. That is a silent network dependency in
+            the middle of enrolment: a host signing up on a poor connection
+            gets no face check at all, and the app quietly falls back to
+            brightness-and-blur scoring — the exact hole this was added to
+            close, reopening itself where it is least likely to be noticed.
+        -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="face" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

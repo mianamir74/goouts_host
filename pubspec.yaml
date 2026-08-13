@@ -66,6 +66,12 @@ dependencies:
   # path_provider  somewhere to write the compressed temp file, which is then
   #              uploaded FROM DISK and deleted.
   image: ^4.1.7
+  # Face checks on the KYC selfie — presence, eye closure, head pose, occlusion.
+  # Free, on-device, offline, no licence key and no per-package binding, which
+  # is why this rather than KBY-AI or Onfido: GoOuts has five bundle IDs and
+  # every commercial SDK licences per bundle ID.
+  # NOT liveness and NOT face recognition — see services/face_check_service.dart.
+  google_mlkit_face_detection: ^0.13.2
   path_provider: ^2.1.4
   shared_preferences: ^2.5.5
   go_router: ^17.1.0

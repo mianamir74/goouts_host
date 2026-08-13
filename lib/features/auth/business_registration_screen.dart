@@ -18,6 +18,7 @@ import 'package:image_picker/image_picker.dart';
 // legal_documents/host_legal, a collection readable before sign-in.
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_host/features/common/goouts_sheet.dart';
+import 'package:goouts_host/services/biometric_selfie_inspector.dart';
 
 import '../short_stay/host/host_collection.dart';
 import 'host_create_profile_screen.dart';
@@ -141,6 +142,15 @@ class _BusinessRegistrationScreenState
   bool _isLookingUpAddress = false;
 
   XFile? _selfieImage;
+
+  /// Confidence scores for the accepted selfie, kept so the NEXT screen can
+  /// hand them to the server-side KYC engine alongside the document scores.
+  ///
+  /// Carried in memory rather than re-scored later, because by the time the
+  /// profile screen runs the selfie has already been uploaded and the local
+  /// file may be gone — image_picker writes to a cache directory the OS is
+  /// free to clear.
+  Map<String, dynamic>? _selfieScores;
 
   @override
   void initState() {
@@ -275,9 +285,46 @@ class _BusinessRegistrationScreenState
       }
 
       if (pickedImage != null) {
+        // ── CHECK THE FACE BEFORE ACCEPTING THE PHOTO ────────────────────
+        //
+        // Added 13 August 2026. Until now the host's selfie was captured and
+        // uploaded with NO validation at all — not even the brightness and
+        // blur checks the consumer and driver apps had. Whatever the camera
+        // returned went straight to Storage and an admin eyeballed it days
+        // later, if they looked at all.
+        //
+        // Now ML Kit answers the only question that matters before the photo
+        // is kept: is there one person in this, facing the camera, eyes open,
+        // face not covered. A wall, a shoe or a ceiling is refused here.
+        //
+        // Nothing biometric is stored — the detector returns numbers and the
+        // face data is discarded. See services/face_check_service.dart.
+        final Map<String, dynamic> check =
+            await BiometricSelfieInspector().inspectSelfie(pickedImage.path);
+        if (!mounted) {
+          return;
+        }
+
+        if (check['isValid'] != true) {
+          await GoOutsSheet.warning(
+            context,
+            title: 'Retake your selfie',
+            message: (check['errorMessage'] as String?) ??
+                'That photo could not be used. Please take it again.',
+          );
+          if (!mounted) {
+            return;
+          }
+          // Deliberately NOT stored. Keeping a refused selfie would let the
+          // host tap Continue with a photo we have already rejected.
+          return;
+        }
+
         setState(() {
           _selfieImage = pickedImage;
           _showSelfieError = false;
+          _selfieScores =
+              Map<String, dynamic>.from(check['scores'] as Map? ?? const {});
         });
       }
     } catch (e) {
@@ -848,7 +895,9 @@ class _BusinessRegistrationScreenState
       // still finishes in the same place.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
-          builder: (_) => const HostCreateProfileScreen(),
+          builder: (_) => HostCreateProfileScreen(
+            selfieScores: _selfieScores,
+          ),
         ),
         (Route<dynamic> route) => false,
       );

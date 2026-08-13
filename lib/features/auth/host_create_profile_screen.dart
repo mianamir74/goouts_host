@@ -6,12 +6,19 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../common/goouts_sheet.dart';
+import '../../services/document_quality_inspector.dart';
 import '../short_stay/host/host_collection.dart';
 import '../home/host_home_screen.dart';
 
 class HostCreateProfileScreen extends StatefulWidget {
-  const HostCreateProfileScreen({super.key});
+  const HostCreateProfileScreen({super.key, this.selfieScores});
+
+  /// Scores for the selfie taken on the previous screen. Null if the host
+  /// reached here another way — the engine then treats the selfie as neutral
+  /// rather than as a failure, because "not measured" is not "bad".
+  final Map<String, dynamic>? selfieScores;
 
   @override
   State<HostCreateProfileScreen> createState() => _HostCreateProfileScreenState();
@@ -29,6 +36,10 @@ class _HostCreateProfileScreenState extends State<HostCreateProfileScreen> {
   File? _kycFrontImage;   // front of driving licence OR main passport page
   File? _kycBackImage;    // back of driving licence (not used for passport)
 
+  // Quality scores for each accepted document, kept for the KYC engine.
+  Map<String, dynamic>? _kycFrontScores;
+  Map<String, dynamic>? _kycBackScores;
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked =
@@ -45,18 +56,221 @@ class _HostCreateProfileScreenState extends State<HostCreateProfileScreen> {
     }
   }
 
+  /// Camera or gallery. Gallery is kept because people photograph their
+  /// passport on a desk with a proper camera, or already have a scan — but
+  /// camera is offered FIRST and is the default expectation for an AML check.
+  Future<ImageSource?> _askDocumentSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (BuildContext ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text('Add your document',
+                  style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87)),
+              const SizedBox(height: 6),
+              Text('Photograph it, or choose an existing image.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: Colors.black54, height: 1.45)),
+              const SizedBox(height: 18),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(ctx, ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt_rounded),
+                      label: const Text('Camera'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0392CA),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(ctx, ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: const Text('Gallery'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF0392CA),
+                        side: BorderSide(color: Colors.grey.shade300),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickKycImage(bool isFront) async {
+    final ImageSource? source = await _askDocumentSource();
+    if (source == null || !mounted) return;
+
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
-    if (picked != null) {
-      if (!mounted) return;   // see _pickImage above
-      setState(() {
-        if (isFront) {
-          _kycFrontImage = File(picked.path);
-        } else {
-          _kycBackImage = File(picked.path);
-        }
+    final picked = await picker.pickImage(source: source, imageQuality: 90);
+    if (picked == null) return;
+    if (!mounted) return;   // see _pickImage above
+
+    // ── VALIDATE BEFORE ACCEPTING ────────────────────────────────────────
+    //
+    // Added 13 August 2026. Until now this screen took whatever came back and
+    // uploaded it. A blurred, dark or half-cropped ID went to Storage looking
+    // exactly like a good one, and the host found out days later when an admin
+    // rejected them — with no way to know which of the two images was at fault.
+    //
+    // The inspector checks file size, brightness, sharpness, aspect ratio and
+    // edge contrast, and returns the specific reason. Telling them now, while
+    // the document is still on the desk in front of them, costs four seconds
+    // instead of a support ticket.
+    final Map<String, dynamic> check =
+        await DocumentQualityInspector().inspectDocument(picked.path);
+    if (!mounted) return;
+
+    if (check['isValid'] != true) {
+      await GoOutsSheet.warning(
+        context,
+        title: 'Retake your document photo',
+        message: (check['errorMessage'] as String?) ??
+            'That image could not be used. Please take it again.',
+      );
+      if (!mounted) return;
+      // NOT stored. Keeping a refused image would let the host tap Continue
+      // with a document we have already rejected.
+      return;
+    }
+
+    setState(() {
+      if (isFront) {
+        _kycFrontImage = File(picked.path);
+        _kycFrontScores =
+            Map<String, dynamic>.from(check['scores'] as Map? ?? const {});
+      } else {
+        _kycBackImage = File(picked.path);
+        _kycBackScores =
+            Map<String, dynamic>.from(check['scores'] as Map? ?? const {});
+      }
+    });
+  }
+
+  // ── Auto-KYC ─────────────────────────────────────────────────────────────
+  //
+  // Hands the on-device confidence scores to kycAutoDecision, the same Cloud
+  // Function the consumer and driver apps call. It applies one set of
+  // thresholds across every app:
+  //
+  //   >= 0.85   AUTO_APPROVED   never reaches the admin queue
+  //   0.65-0.84 MANUAL_REVIEW   admin reviews, as before
+  //   <  0.65   AUTO_REJECTED   host asked to resubmit
+  //
+  // ⚠ NEVER A GATE. Every failure is swallowed. If the call errors, times out
+  // or the host is offline, the record simply stays 'pending' and an admin
+  // reviews it manually — exactly as it did before this existed. An identity
+  // check that blocks enrolment when a network call fails is worse than no
+  // automation at all.
+  //
+  // Note this sends SCORES, never images. The photographs are already in
+  // Storage; nothing biometric and no image bytes travel through this call.
+  Future<void> _runAutoKycDecision({required String uid}) async {
+    try {
+      // ── Selfie ───────────────────────────────────────────────────────────
+      //
+      // Comes from the previous screen. 0.75 when absent — NEUTRAL, not zero.
+      // A host who reached here by another route has an unmeasured selfie, and
+      // scoring that as 0.0 would auto-reject someone for a routing quirk.
+      // 0.75 lands them in manual review, which is the honest answer.
+      final Map<String, dynamic> selfieScores =
+          widget.selfieScores ?? <String, dynamic>{'overall': 0.75};
+
+      // ── Document ─────────────────────────────────────────────────────────
+      //
+      // A driving licence has two sides. Take the WEAKER of the two: an
+      // unreadable back is just as disqualifying as an unreadable front, and
+      // averaging would let a perfect front carry a useless back over the
+      // approval line. Same rule as driver_app.
+      Map<String, dynamic> documentScores =
+          <String, dynamic>{'overall': 0.75};
+
+      final Map<String, dynamic>? front = _kycFrontScores;
+      final Map<String, dynamic>? back = _kycBackScores;
+
+      if (front != null && back != null) {
+        final double fo = (front['overall'] as num?)?.toDouble() ?? 0.0;
+        final double bo = (back['overall'] as num?)?.toDouble() ?? 0.0;
+        documentScores = fo <= bo ? front : back;
+      } else if (front != null) {
+        documentScores = front;
+      } else if (back != null) {
+        documentScores = back;
+      }
+
+      // ── Profile completeness ─────────────────────────────────────────────
+      //
+      // The things an admin would otherwise eyeball. Read back from Firestore
+      // rather than from this screen's state, because the business details
+      // were entered on the PREVIOUS screen and this one never held them.
+      double profileCompleteness = 0.5;
+      try {
+        final DocumentSnapshot<Map<String, dynamic>> snap =
+            await FirebaseFirestore.instance
+                .collection(kStayHostsCollection)
+                .doc(uid)
+                .get();
+        final Map<String, dynamic> d = snap.data() ?? <String, dynamic>{};
+
+        bool has(String k) => (d[k] ?? '').toString().trim().isNotEmpty;
+
+        const double perField = 1.0 / 6.0;
+        double c = 0.0;
+        if (has('firstName')) c += perField;
+        if (has('surname')) c += perField;
+        if (has('email')) c += perField;
+        if (has('postcode')) c += perField;
+        if (has('city')) c += perField;
+        if (_profileImage != null || has('photoUrl')) c += perField;
+        profileCompleteness =
+            double.parse(c.clamp(0.0, 1.0).toStringAsFixed(4));
+      } catch (_) {
+        // Read failed. Keep the neutral 0.5 rather than scoring zero — a
+        // Firestore hiccup is not evidence of an incomplete profile.
+      }
+
+      // europe-west1. Every GoOuts function is deployed there and the default
+      // region is us-central1, so calling without instanceFor silently hits an
+      // endpoint that does not exist — and because this whole method swallows
+      // its errors, that failure would be invisible: no auto-decision would
+      // ever run and nobody would know why the admin queue never shrank.
+      await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('kycAutoDecision')
+          .call(<String, dynamic>{
+        'selfieScores': selfieScores,
+        'documentScores': documentScores,
+        'profileCompleteness': profileCompleteness,
+        'documentType': _selectedDocType,
       });
+    } catch (e) {
+      debugPrint('host auto-KYC skipped — $e');
     }
   }
 
@@ -113,6 +327,11 @@ class _HostCreateProfileScreenState extends State<HostCreateProfileScreen> {
           await FirebaseFirestore.instance.collection(kStayHostsCollection).doc(uid)
               .set(kycData, SetOptions(merge: true));
         }
+
+        // Runs AFTER the documents are in Storage and recorded. If the engine
+        // auto-approves a host whose files never uploaded, an admin opening
+        // the record finds a verified host with no ID to look at.
+        await _runAutoKycDecision(uid: uid);
       }
     } catch (_) {
       // Still non-fatal — the photo and documents can be added later from the
