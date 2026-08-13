@@ -285,8 +285,9 @@ class _CreateListingAddressScreenState
 
   /// House/flat number and postcode, side by side, then Find.
   ///
-  /// The number is FIRST and narrower — it is the shorter answer and the one
-  /// people reach for first when asked where they live.
+  /// The number is FIRST and WIDER. It is the one people reach for first when
+  /// asked where they live, and it is the one whose length varies — a postcode
+  /// has a hard 8-character ceiling, "Apartment 12B" does not.
   Widget _lookupSection() {
     return WizardSection(
       title: 'Find your address',
@@ -298,11 +299,19 @@ class _CreateListingAddressScreenState
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // Narrower: a house number is rarely more than 3-4 characters,
-              // and giving it equal width to the postcode makes the postcode
-              // field feel cramped on a small phone.
-              SizedBox(
-                width: 110,
+              // WIDTHS SWAPPED 13 August 2026.
+              //
+              // The house field was a fixed 110px and the postcode took the
+              // rest, which was backwards. A UK postcode is at most 8
+              // characters ("SW1A 1AA") and never grows; a house or flat
+              // entry regularly does — "Flat 12B", "Apartment 4", "Unit 7A" —
+              // and at 110px those scrolled sideways as you typed while the
+              // postcode sat in a box twice the width it could ever need.
+              //
+              // Now the postcode is the fixed one, sized to fit its longest
+              // possible value plus padding, and the house field takes
+              // everything else.
+              Expanded(
                 child: TextField(
                   controller: _houseNoCtrl,
                   textCapitalization: TextCapitalization.characters,
@@ -318,7 +327,8 @@ class _CreateListingAddressScreenState
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
+              SizedBox(
+                width: 138,
                 child: TextField(
                   controller: _postcodeCtrl,
                   textCapitalization: TextCapitalization.characters,
@@ -334,7 +344,9 @@ class _CreateListingAddressScreenState
                   ],
                   decoration: const InputDecoration(
                     labelText: 'Postcode',
-                    hintText: 'e.g. SW1A 1AA',
+                    // "e.g. " dropped — the hint has to fit a 138px box and
+                    // the prefix was the first thing to be clipped.
+                    hintText: 'SW1A 1AA',
                   ),
                 ),
               ),

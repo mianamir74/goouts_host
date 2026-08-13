@@ -21,6 +21,7 @@ import 'package:goouts_host/features/common/goouts_sheet.dart';
 
 import '../short_stay/host/host_collection.dart';
 import 'host_create_profile_screen.dart';
+import 'host_pin_credential.dart';
 
 class BusinessRegistrationScreen extends StatefulWidget {
   const BusinessRegistrationScreen({
@@ -340,15 +341,29 @@ class _BusinessRegistrationScreenState
   }) async {
     try {
       final String phone = currentUser.phoneNumber ?? '';
-      final String email =
-          '${phone.replaceAll('+', '').replaceAll(' ', '')}@goouts.app';
+      // hostAuthEmail / hostPinPassword — see host_pin_credential.dart.
+      //
+      // The password MUST go through hostPinPassword. Firebase rejects
+      // anything under 6 characters, and a raw 4-digit PIN is four, so the
+      // previous version of this method threw weak-password on EVERY
+      // registration and the catch below hid it. No host has ever had a
+      // working PIN because of this one line.
       final AuthCredential cred = EmailAuthProvider.credential(
-        email: email,
-        password: password,
+        email: hostAuthEmail(phone),
+        password: hostPinPassword(password),
       );
       await currentUser.linkWithCredential(cred);
-    } catch (_) {
-      // Already linked or non-critical — ignore
+      debugPrint('host PIN credential linked for $phone');
+    } on FirebaseAuthException catch (e) {
+      // NOT silent any more. 'provider-already-linked' is genuinely fine and
+      // stays quiet; anything else is a host who will not be able to sign in
+      // with their PIN, and we want that in the logs rather than invisible.
+      if (e.code != 'provider-already-linked' &&
+          e.code != 'credential-already-in-use') {
+        debugPrint('host PIN credential link FAILED: ${e.code} ${e.message}');
+      }
+    } catch (e) {
+      debugPrint('host PIN credential link FAILED: $e');
     }
   }
 

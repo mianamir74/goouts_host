@@ -42,6 +42,7 @@ import 'otp_verification_screen.dart';
 import 'signup_screen.dart';
 import '../home/host_home_screen.dart';
 import 'host_change_pin_screen.dart';
+import 'host_pin_credential.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -302,14 +303,15 @@ class _LoginScreenState extends State<LoginScreen> {
     //
     // OTP remains the fallback: no linked credential, or a forgotten PIN,
     // falls through to the SMS path below.
-    final String emailForAuth =
-        '${fullPhone.replaceAll('+', '').replaceAll(' ', '')}@goouts.app';
+    // Both values come from host_pin_credential.dart so this screen can never
+    // drift from the one that created the credential.
+    final String emailForAuth = hostAuthEmail(fullPhone);
 
     setState(() => _isLoading = true);
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailForAuth,
-        password: pin,
+        password: hostPinPassword(pin),
       );
       if (!mounted) return;
       setState(() => _isLoading = false);

@@ -31,6 +31,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/goouts_colors.dart';
 import '../short_stay/host/host_routes.dart';
+import 'host_pin_credential.dart';
 
 class HostChangePinScreen extends StatefulWidget {
   const HostChangePinScreen({super.key});
@@ -83,7 +84,7 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
   String? _authEmail(User user) {
     final phone = user.phoneNumber;
     if (phone == null || phone.isEmpty) return null;
-    return '${phone.replaceAll('+', '').replaceAll(' ', '')}@goouts.app';
+    return hostAuthEmail(phone);
   }
 
   Future<void> _save() async {
@@ -134,13 +135,15 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
         // only call that works here; updatePassword needs a credential to
         // already exist, and reauthenticate needs one to check against.
         await user.linkWithCredential(
-          EmailAuthProvider.credential(email: email, password: next),
+          EmailAuthProvider.credential(
+              email: email, password: hostPinPassword(next)),
         );
       } else {
         await user.reauthenticateWithCredential(
-          EmailAuthProvider.credential(email: email, password: current),
+          EmailAuthProvider.credential(
+              email: email, password: hostPinPassword(current)),
         );
-        await user.updatePassword(next);
+        await user.updatePassword(hostPinPassword(next));
       }
 
       if (!mounted) return;
@@ -159,8 +162,13 @@ class _HostChangePinScreenState extends State<HostChangePinScreen> {
         _error = switch (e.code) {
           'wrong-password' || 'invalid-credential' =>
             'That is not your current PIN.',
+          // Should now be unreachable — hostPinPassword always clears
+          // Firebase's 6-character minimum. Kept honest rather than guessing
+          // at digit patterns, which is what the old wording did and it sent
+          // people hunting for a rule that never existed.
           'weak-password' =>
-            'That PIN was refused. Avoid four identical or sequential digits.',
+            'Firebase refused that PIN. Please contact support — this should '
+                'not happen.',
           'too-many-requests' =>
             'Too many attempts. Wait a few minutes and try again.',
           'user-not-found' =>
