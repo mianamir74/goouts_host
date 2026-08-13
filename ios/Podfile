@@ -1,0 +1,86 @@
+# GoOuts Host — iOS pods.
+#
+# ── WHY THIS FILE EXISTS ─────────────────────────────────────────────────
+#
+# 13 August 2026. The iOS build went red the moment google_mlkit_face_detection
+# was added.
+#
+# THE CAUSE: this app had NO Podfile at all. It had never had one — it was not
+# in git and nothing had needed it, because Flutter generates a default at
+# build time when one is missing. That default ships the platform line
+# COMMENTED OUT:
+#
+#     # platform :ios, '12.0'
+#
+# so CocoaPods falls back to iOS 12 for every pod target. Xcode was building
+# the app itself at 15.0 (IPHONEOS_DEPLOYMENT_TARGET in project.pbxproj), so
+# nothing ever disagreed — until a pod arrived with a real floor.
+#
+# GoogleMLKit/FaceDetection requires iOS 15.0. CocoaPods resolves against 12,
+# finds nothing satisfying it, and stops:
+#
+#     [!] CocoaPods could not find compatible versions for pod
+#         "GoogleMLKit/FaceDetection"
+#
+# Every other GoOuts app already carries its own Podfile pinned to 15.0, which
+# is why driver_app took the same package without complaint.
+#
+# ── ⚠ DO NOT DELETE THIS FILE ────────────────────────────────────────────
+#
+# It looks like generated scaffolding and it is not. Removing it does not fall
+# back to something sensible — it falls back to iOS 12 and breaks the build,
+# with an error that points at ML Kit rather than at the missing file.
+platform :ios, '15.0'
+
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig and running flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      # 15.0 on every pod, not just the app. A pod left at the CocoaPods
+      # default will still fail ML Kit's version check even with the platform
+      # line above set, because flutter_additional_ios_build_settings can
+      # lower individual targets back down.
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+
+      # Force Swift 5 mode — prevents Swift 6 strict-concurrency crashes in
+      # Firebase iOS SDK 11.x (libswift_Concurrency preconditionFailure).
+      # Copied from driver_app, where that crash was diagnosed the hard way.
+      config.build_settings['SWIFT_VERSION'] = '5'
+    end
+  end
+end

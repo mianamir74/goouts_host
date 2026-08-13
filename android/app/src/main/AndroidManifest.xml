@@ -32,15 +32,18 @@
             android:value="2" />
 
         <!--
-            ML Kit face model, installed with the app rather than downloaded
-            on first use.
+            ML Kit face model.
 
-            Without this line Play Services fetches the model the first time a
-            host takes their KYC selfie. That is a silent network dependency in
-            the middle of enrolment: a host signing up on a poor connection
-            gets no face check at all, and the app quietly falls back to
-            brightness-and-blur scoring — the exact hole this was added to
-            close, reopening itself where it is least likely to be noticed.
+            NOTE: this is belt-and-braces, not the thing that makes it work.
+            The google_mlkit_face_detection plugin depends on the BUNDLED
+            artifact (com.google.mlkit:face-detection), which ships the model
+            inside the app already — so face checks work offline and on first
+            launch with or without this line.
+
+            It is kept because it costs nothing and becomes load-bearing the
+            day anyone switches to the thin Play-Services variant
+            (play-services-mlkit-face-detection), which downloads the model on
+            first use unless this tells Play Services to fetch it at install.
         -->
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
