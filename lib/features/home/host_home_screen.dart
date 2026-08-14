@@ -31,14 +31,8 @@ class HostHomeScreen extends StatelessWidget {
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
+            // One shared helper — see features/auth/host_sign_out.dart.
+            onPressed: () => hostSignOut(context),
           ),
         ],
       ),

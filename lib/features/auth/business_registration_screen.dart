@@ -137,6 +137,29 @@ class _BusinessRegistrationScreenState
   double? _verifiedLongitude;
   // Locked only when address was actually auto-filled from OS bottom sheet.
   bool _addressFieldsLocked = false;
+
+  /// True when the applicant gave up on the lookup and typed their address in
+  /// by hand.
+  ///
+  /// ── WHY THIS EXISTS ────────────────────────────────────────────────────
+  ///
+  /// 14 August 2026, reported as: "postcode lookup says address not found, so
+  /// I enter it manually, and then it always says enter postcode even though
+  /// it IS entered."
+  ///
+  /// It was a dead end and it was not subtle. "Enter manually" cleared
+  /// _isPostcodeVerified so the fields became editable — and the submit guard
+  /// hard-required _isPostcodeVerified == true. So choosing manual entry made
+  /// the form permanently unsubmittable, and the error pointed at the postcode
+  /// box, which was full. Nothing the applicant typed could ever satisfy it.
+  ///
+  /// Anyone whose address Mapbox does not know — a new build, a flat
+  /// subdivision, a rural address — could not register at all.
+  ///
+  /// The address is still recorded as UNVERIFIED (postcodeVerified: false), so
+  /// an admin can see it was hand-typed. That is the honest outcome: let them
+  /// through, and mark how they got in.
+  bool _manualAddressEntry = false;
   List<MapboxSuggestResult> _addressSuggestions = [];
   String _mapboxSessionToken = AddressLookupService.generateSessionToken();
   bool _isLookingUpAddress = false;
@@ -548,6 +571,9 @@ class _BusinessRegistrationScreenState
       _verifiedLatitude = null;
       _verifiedLongitude = null;
       _addressFieldsLocked = false;
+      // Unlocks the submit guard. Without this the fields become editable and
+      // the form still refuses to accept them.
+      _manualAddressEntry = true;
     });
     _showSnackBarMessage(
       'Address fields are now editable. Re-tap "Find Official Address" to re-verify.',
@@ -667,9 +693,31 @@ class _BusinessRegistrationScreenState
       return;
     }
 
-    if (!_isPostcodeVerified) {
-      _showSnackBarMessage('Please confirm your postcode before continuing.');
+    // Verified by lookup, OR typed by hand after the lookup failed. The form
+    // validator has already checked the postcode is a valid UK format; this
+    // only decides whether it also had to be CONFIRMED against Mapbox.
+    if (!_isPostcodeVerified && !_manualAddressEntry) {
+      _showSnackBarMessage(
+        'Tap "Look Up Address" to confirm your postcode, or use '
+        '"Enter manually" if your address is not found.',
+      );
       return;
+    }
+
+    // Manual entry still needs the fields actually filled in — the lookup
+    // normally populates these, and nothing else would catch them being blank.
+    if (_manualAddressEntry) {
+      if (_postcodeController.text.trim().isEmpty) {
+        _showSnackBarMessage('Please enter your postcode.');
+        return;
+      }
+      if (_roadNameController.text.trim().isEmpty ||
+          _townController.text.trim().isEmpty) {
+        _showSnackBarMessage(
+          'Please enter your street and town.',
+        );
+        return;
+      }
     }
 
     if (_selectedCountry == null || _selectedCountry!.trim().isEmpty) {
@@ -755,6 +803,10 @@ class _BusinessRegistrationScreenState
         'postcodeVerified': _isPostcodeVerified,
         'postcodeVerificationProvider':
             _isPostcodeVerified ? 'os_mapbox_hybrid' : '',
+        // Flags a hand-typed address for the admin reviewer. An unverified
+        // address is acceptable; an unverified address nobody KNOWS is
+        // unverified is not.
+        'addressEnteredManually': _manualAddressEntry,
         'addressUprn': _verifiedUprn,
         'addressFull': _verifiedFullAddress,
         'addressLatitude': _verifiedLatitude,

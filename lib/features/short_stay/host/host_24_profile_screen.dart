@@ -127,12 +127,11 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
       ),
     );
     if (go != true) return;
-    await FirebaseAuth.instance.signOut();
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+    // One shared helper — see features/auth/host_sign_out.dart. This used to
+    // sign out and navigate inline, as did the home screen's app bar button,
+    // and nothing kept the two copies in step.
+    await hostSignOut(context);
   }
 
   @override

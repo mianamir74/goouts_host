@@ -59,7 +59,38 @@ Future<void> enforceFreshInstallSignOut() async {
 
     // First launch on this install. If a session exists, it came out of the
     // Keychain after a delete — it did not come from anyone signing in.
-    final user = FirebaseAuth.instance.currentUser;
+    //
+    // ── ⚠ WHY THIS AWAITS A STREAM INSTEAD OF READING currentUser ──────────
+    //
+    // FIXED 13 August 2026. This used to be:
+    //
+    //     final user = FirebaseAuth.instance.currentUser;
+    //
+    // which is a SYNCHRONOUS read, and on iOS it is unreliable at this point
+    // in startup. Firebase restores the Keychain session ASYNCHRONOUSLY after
+    // initializeApp returns. Called immediately, currentUser can still be null
+    // while a perfectly good session is a few milliseconds from arriving.
+    //
+    // The guard would then see nothing, sign nobody out, write its marker, and
+    // return. Moments later Firebase finishes restoring, authStateChanges
+    // emits the OLD user, and the app opens straight into the previous owner's
+    // account — which is the exact thing this file exists to prevent, failing
+    // silently and only on slower or colder devices.
+    //
+    // authStateChanges() always emits once with the resolved state (a user or
+    // null), so awaiting the first event asks the question at the right time.
+    //
+    // The timeout matters too: if Firebase never emits — no network on a cold
+    // start, an SDK fault — this must not hang before runApp and leave a black
+    // screen. Five seconds, then fall back to the old synchronous read, which
+    // is no worse than the behaviour we are replacing.
+    final User? user = await FirebaseAuth.instance
+        .authStateChanges()
+        .first
+        .timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => FirebaseAuth.instance.currentUser,
+        );
     if (user != null) {
       debugPrint(
         'fresh_install_guard: signing out a session that survived a reinstall '
