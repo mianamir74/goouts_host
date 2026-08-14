@@ -16,21 +16,34 @@
 # the app itself at 15.0 (IPHONEOS_DEPLOYMENT_TARGET in project.pbxproj), so
 # nothing ever disagreed — until a pod arrived with a real floor.
 #
-# GoogleMLKit/FaceDetection requires iOS 15.0. CocoaPods resolves against 12,
-# finds nothing satisfying it, and stops:
+# ML Kit requires iOS 15.5. CocoaPods resolved against 12, found nothing
+# satisfying it, and stopped:
 #
 #     [!] CocoaPods could not find compatible versions for pod
-#         "GoogleMLKit/FaceDetection"
+#         "google_mlkit_commons"
+#     ... they required a higher minimum deployment target.
 #
-# Every other GoOuts app already carries its own Podfile pinned to 15.0, which
-# is why driver_app took the same package without complaint.
+# ── ⚠ 15.5, NOT 15.0 ─────────────────────────────────────────────────────
+#
+# The first fix here set 15.0 and failed again, because the two ML Kit pods
+# do not agree with each other:
+#
+#     GoogleMLKit/FaceDetection   15.0
+#     google_mlkit_commons        15.5   <- the binding constraint
+#
+# 15.0 clears the visible one and stops at the second. Flutter's own error
+# names the real floor, and it is 15.5. driver_app and goouts_app were both
+# pinned at 15.0 and would have failed identically on their next build — all
+# three are now 15.5.
+#
+# Cost to users is nil: every device that can run iOS 15.0 can run 15.8.
 #
 # ── ⚠ DO NOT DELETE THIS FILE ────────────────────────────────────────────
 #
 # It looks like generated scaffolding and it is not. Removing it does not fall
 # back to something sensible — it falls back to iOS 12 and breaks the build,
 # with an error that points at ML Kit rather than at the missing file.
-platform :ios, '15.0'
+platform :ios, '15.5'
 
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
@@ -71,11 +84,11 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      # 15.0 on every pod, not just the app. A pod left at the CocoaPods
+      # 15.5 on every pod, not just the app. A pod left at the CocoaPods
       # default will still fail ML Kit's version check even with the platform
       # line above set, because flutter_additional_ios_build_settings can
       # lower individual targets back down.
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
 
       # Force Swift 5 mode — prevents Swift 6 strict-concurrency crashes in
       # Firebase iOS SDK 11.x (libswift_Concurrency preconditionFailure).

@@ -100,10 +100,30 @@ jobs:
           echo "iOS build number -> $BUILD_NUM"
           cd ios && agvtool new-version -all "$BUILD_NUM"
 
+      # ── MAPBOX_TOKEN COMES FROM A REPOSITORY SECRET, NOT FROM THE SOURCE ──
+      #
+      # 13 August 2026. The token used to be hardcoded in
+      # lib/services/address_lookup_service.dart. On the day this repo was made
+      # public, GitHub push protection refused the push (GH013) because it
+      # recognised a live Mapbox token in the diff. It was right to.
+      #
+      # A Mapbox token is BILLABLE and public repos are scraped for them, so a
+      # leak is somebody else's address lookups on our invoice. The previous
+      # token had to be rotated across six files in four repositories.
+      #
+      # ⚠ IF THIS SECRET IS MISSING the build still SUCCEEDS — --dart-define
+      # simply passes an empty string. The app installs, looks completely
+      # normal, and every postcode lookup silently returns nothing. There is no
+      # build error to catch it. AddressLookupService logs a loud warning at
+      # runtime for exactly this reason; look for "MAPBOX_TOKEN is empty" in
+      # the device console if addresses stop resolving after a build.
+      #
+      # Add it at: Settings > Secrets and variables > Actions > MAPBOX_TOKEN
       - name: Build IPA
         run: |
           flutter build ipa \
             --release \
+            --dart-define=MAPBOX_TOKEN=${{ secrets.MAPBOX_TOKEN }} \
             --export-options-plist="$HOME/export_options.plist"
 
       # ── ATTACH THE BUILD TO THE TESTER GROUP AUTOMATICALLY ─────────────────

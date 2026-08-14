@@ -15,8 +15,47 @@ import 'package:http/http.dart' as http;
 ///  2. Food delivery picker — free-text autofill with session tokens
 ///     (suggest calls = FREE within session; only retrieve = 1 paid call)
 class AddressLookupService {
+  // ── ⚠ THE TOKEN IS NOT IN THIS FILE. THAT IS DELIBERATE. ────────────────
+  //
+  // 13 August 2026. It used to be, hardcoded, and on the day goouts_host was
+  // made public GitHub push protection refused the push (GH013) because it
+  // recognised a live Mapbox token in the diff. GitHub was right.
+  //
+  // A Mapbox token is BILLABLE. Scrapers watch public commits for exactly this
+  // pattern, and every lookup someone else makes with a leaked token is
+  // charged to us. The previous token had to be rotated for this reason.
+  //
+  // ── HOW IT GETS HERE NOW ────────────────────────────────────────────────
+  //
+  // Compile time, via --dart-define. CI passes it from a repository secret:
+  //
+  //     flutter build ipa --dart-define=MAPBOX_TOKEN=${{ secrets.MAPBOX_TOKEN }}
+  //
+  // so the value lives in GitHub Secrets and never in git. Rotating it becomes
+  // one field in Settings > Secrets, not six files across four repositories
+  // followed by four builds — which is precisely what the last rotation cost.
+  //
+  // ── ⚠ WHAT THIS DOES NOT DO ─────────────────────────────────────────────
+  //
+  // It does NOT hide the token from a determined attacker. --dart-define bakes
+  // the string into the binary, and anyone can extract strings from an IPA or
+  // an APK. It keeps the token out of PUBLIC SOURCE, which is the leak that
+  // actually happens in practice.
+  //
+  // The real protection is at Mapbox: restrict the token to our bundle IDs
+  // (com.goouts.app, com.goouts.lead, com.goouts.host) under URL restrictions,
+  // and set a usage alert. Do that as well as this, not instead of it.
+  //
+  // Empty when the define is missing — a local `flutter run` without it, for
+  // instance. Every network method checks and fails loudly rather than sending
+  // Mapbox an empty token and reporting "no addresses found", which reads as a
+  // broken postcode rather than a broken build.
   static const String _mapboxToken =
-      'pk.eyJ1IjoibWlhbmFtaXI3NCIsImEiOiJjbW44aGp1bTYwYzVrMnBxcnRvYzA5bG40In0.2thWcmSMupWuGVNKJmfQyg';
+      String.fromEnvironment('MAPBOX_TOKEN', defaultValue: '');
+
+  /// True when no token was compiled in. Callers do not need this — the
+  /// methods below handle it — but it makes the cause visible in a debugger.
+  static bool get hasToken => _mapboxToken.isNotEmpty;
 
   // ─── Session token ────────────────────────────────────────────────────────
 
@@ -59,6 +98,21 @@ class AddressLookupService {
   /// Returns up to 10 real physical addresses for the given postcode.
   /// User picks one from a dropdown — no second call needed.
   Future<List<MapboxAddressResult>> validatePostcode(String postcode) async {
+    // No token compiled in. Say so once, loudly. Sending Mapbox an empty
+    // access_token returns 401, which every caller here turns into "no
+    // addresses found" — indistinguishable from a genuinely unknown postcode,
+    // and it would send someone hunting a Mapbox account problem that does
+    // not exist.
+    if (_mapboxToken.isEmpty) {
+      developer.log(
+        'MAPBOX_TOKEN is empty. Build with --dart-define=MAPBOX_TOKEN=<token>. '
+        'Address lookup is disabled.',
+        name: 'AddressLookupService',
+        level: 1000,
+      );
+      return const <MapboxAddressResult>[];
+    }
+
     final String normalised = normalise(postcode);
     try {
       // Use Mapbox Geocoding v5 — works with any standard public token.
@@ -166,6 +220,21 @@ class AddressLookupService {
   /// Minimum 3 characters before firing.
   Future<List<MapboxSuggestResult>> suggest(
       String query, String sessionToken) async {
+    // No token compiled in. Say so once, loudly. Sending Mapbox an empty
+    // access_token returns 401, which every caller here turns into "no
+    // addresses found" — indistinguishable from a genuinely unknown postcode,
+    // and it would send someone hunting a Mapbox account problem that does
+    // not exist.
+    if (_mapboxToken.isEmpty) {
+      developer.log(
+        'MAPBOX_TOKEN is empty. Build with --dart-define=MAPBOX_TOKEN=<token>. '
+        'Address lookup is disabled.',
+        name: 'AddressLookupService',
+        level: 1000,
+      );
+      return const <MapboxSuggestResult>[];
+    }
+
     if (query.trim().length < 3) return [];
     try {
       final uri = Uri.https(
@@ -209,6 +278,21 @@ class AddressLookupService {
   /// Always generate a new session token after calling this.
   Future<MapboxAddressResult?> retrieve(
       String mapboxId, String sessionToken) async {
+    // No token compiled in. Say so once, loudly. Sending Mapbox an empty
+    // access_token returns 401, which every caller here turns into "no
+    // addresses found" — indistinguishable from a genuinely unknown postcode,
+    // and it would send someone hunting a Mapbox account problem that does
+    // not exist.
+    if (_mapboxToken.isEmpty) {
+      developer.log(
+        'MAPBOX_TOKEN is empty. Build with --dart-define=MAPBOX_TOKEN=<token>. '
+        'Address lookup is disabled.',
+        name: 'AddressLookupService',
+        level: 1000,
+      );
+      return null;
+    }
+
     try {
       final uri = Uri.https(
         'api.mapbox.com',
@@ -275,6 +359,21 @@ class AddressLookupService {
 
   Future<MapboxAddressResult?> reverseGeocode(
       double latitude, double longitude) async {
+    // No token compiled in. Say so once, loudly. Sending Mapbox an empty
+    // access_token returns 401, which every caller here turns into "no
+    // addresses found" — indistinguishable from a genuinely unknown postcode,
+    // and it would send someone hunting a Mapbox account problem that does
+    // not exist.
+    if (_mapboxToken.isEmpty) {
+      developer.log(
+        'MAPBOX_TOKEN is empty. Build with --dart-define=MAPBOX_TOKEN=<token>. '
+        'Address lookup is disabled.',
+        name: 'AddressLookupService',
+        level: 1000,
+      );
+      return null;
+    }
+
     try {
       final Uri uri = Uri.https(
         'api.mapbox.com',
