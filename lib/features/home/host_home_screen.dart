@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../theme/goouts_colors.dart';
-import '../auth/login_screen.dart';
+import '../auth/host_sign_out.dart';
 import '../short_stay/host/host_routes.dart';
 
 /// Landing screen for a signed-in host, shown before the dashboard.

@@ -28,6 +28,15 @@ analyzer:
   exclude:
     - build/**
     - ios/Pods/**
+    # ── Excluded 14 August 2026 ────────────────────────────────────────────
+    #
+    # flutter analyze walks the whole project folder, not just lib/. Anything
+    # dropped alongside the app — a backup copy, an old branch, a second
+    # project — is reported as if it were live code.
+    #
+    # That is not cosmetic. Real errors hide in a list padded with problems
+    # from files nobody ships, and a long report trains you to skim it. Two
+    # genuine compile errors reached GitHub today for exactly that reason.
 
 linter:
   # The lint rules applied to this project can be customized in the

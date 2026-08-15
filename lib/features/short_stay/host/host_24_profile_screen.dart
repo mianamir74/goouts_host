@@ -34,7 +34,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../theme/goouts_colors.dart';
-import '../../auth/login_screen.dart';
+import '../../auth/host_sign_out.dart';
 import '../../short_stay/host/host_collection.dart';
 import 'host_bottom_nav.dart';
 import 'host_routes.dart';

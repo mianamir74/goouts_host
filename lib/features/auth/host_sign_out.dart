@@ -29,7 +29,6 @@
 // different intents, and the splash offers both doors while this offers the
 // one that was just asked for.
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'login_screen.dart';
