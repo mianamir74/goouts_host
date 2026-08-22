@@ -80,8 +80,13 @@ dependencies:
   http: ^1.2.0                  # address_lookup_service — postcode autocomplete
   intl: ^0.20.2                 # short_stay/models/money.dart — currency format
 
+  # Added 21 August 2026, when guest→host messaging needed a way to reach a
+  # host who is not looking at the app. The iOS APNs entitlement was already
+  # in Runner.entitlements — Firebase Phone Auth needed it for its silent
+  # verification push — so this is the plugin, not the platform setup.
+  firebase_messaging: ^16.0.0
+
   # NOT copied from driver_app, and the omissions are deliberate:
-  #   firebase_messaging  — no push notifications wired yet
   #   image               — on-device KYC scoring; add when the KYC screens
   #                         actually score rather than just capture
   #   url_launcher, gallery_saver_plus — nothing imports them

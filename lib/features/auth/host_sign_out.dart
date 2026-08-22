@@ -31,6 +31,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../services/host_fcm_service.dart';
 import 'login_screen.dart';
 
 /// Signs the host out and returns them to the login screen.
@@ -39,6 +40,22 @@ import 'login_screen.dart';
 /// into the dashboard of the account that was just signed out of — on a phone
 /// that has been handed to someone else, that is the whole point.
 Future<void> hostSignOut(BuildContext context) async {
+  // ⚠ BEFORE signOut(), NOT AFTER, AND THIS ORDER IS THE WHOLE POINT.
+  //
+  // The write is to stay_hosts/{uid}, and the rule is ownsDoc — it compares
+  // the document id to the SIGNED-IN uid. A moment after signOut() there is no
+  // uid, the write is refused, and this device's push token stays on the
+  // account that just left. The next host to sign in on this phone would then
+  // receive the previous one's booking and message notifications.
+  //
+  // Awaited, and its failure is swallowed inside clearToken — a network error
+  // must not trap somebody on a screen they are trying to leave.
+  try {
+    await HostFcmService.instance.clearToken();
+  } catch (e) {
+    debugPrint('hostSignOut: could not clear push token — $e');
+  }
+
   try {
     await FirebaseAuth.instance.signOut();
   } catch (e) {

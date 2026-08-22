@@ -2,9 +2,26 @@
 // Imported and renamed 4 August 2026. See
 // goouts/design/SHORT_STAY_HOST_WIRING_PLAN.md
 //
-// NOT WIRED. Every handler in this file is still empty and every
-// figure on screen is placeholder copy from Stitch. Do not read a
-// number here as real data.
+// ── ⚠ PAYOUT SETUP IS NOT BUILT. THE FIELDS ARE DISABLED ON PURPOSE. ───────
+//
+// Guarded 6 August 2026, tightened 21 August 2026.
+//
+// No handler in this file is wired and no field has a controller, so a sort
+// code typed here is discarded the moment the screen closes. Until 21 August
+// the fields still ACCEPTED input under a caption reading "SECURE END TO END
+// ENCRYPTION" — a host could type their real account number, date of birth
+// and National Insurance number into a form that saved none of it, while
+// being told it was encrypted. Nothing was transmitted, so nothing was
+// encrypted, and the claim was simply untrue.
+//
+// The fields are now enabled: false and the encryption claim is gone. Do not
+// re-enable them to "make the screen feel finished" — an enabled field is a
+// promise that what you type is kept.
+//
+// WHEN THIS IS BUILT: it hands off to Stripe Connect onboarding, which
+// collects bank details directly. Sort code + account number + date of birth
+// + home address is an identity theft kit and does not belong in our own
+// database. GoOuts stores only the account id Stripe returns.
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -51,6 +68,8 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildNotOpenYetNotice(),
+                  const SizedBox(height: 24),
                   _buildSectionHeader(Icons.account_balance_outlined, 'Bank account details'),
                   const SizedBox(height: 16),
                   _buildBankAccountForm(),
@@ -134,6 +153,55 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Says plainly, before the host reaches a single greyed-out field, why
+  /// they cannot fill anything in. Without this the disabled form reads as a
+  /// bug rather than a deliberate hold.
+  Widget _buildNotOpenYetNotice() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: GoOutsColors.warningBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: GoOutsColors.warning.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.lock_clock_outlined,
+              size: 18, color: GoOutsColors.warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Payout setup is not open yet',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: GoOutsColors.navy,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'These fields are switched off until GoOuts is connected to '
+                  'its payment provider. We would rather show you nothing than '
+                  'take your bank details somewhere they are not yet handled '
+                  'properly. Your listings and bookings are unaffected.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    height: 1.5,
+                    color: GoOutsColors.body,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -251,6 +319,10 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
 
   Widget _buildTextField(String hint, {IconData? suffixIcon}) {
     return TextField(
+      // ⚠ DISABLED DELIBERATELY. Nothing on this screen is captured or saved.
+      // A field that accepts a sort code and throws it away is worse than no
+      // field at all. See the header.
+      enabled: false,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: GoogleFonts.inter(color: GoOutsColors.body.withValues(alpha: 0.5), fontSize: 14),
@@ -296,7 +368,7 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
-              'Secure UK payment processing',
+              'UK payouts open when payments go live',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 14,
@@ -375,13 +447,16 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          // The line that stood here read "SECURE END-TO-END ENCRYPTION".
+          // Nothing on this screen is transmitted or stored, so nothing is
+          // encrypted, and a security claim that is not true is worse than no
+          // claim. Replaced with what is actually the case.
           Text(
-            'SECURE END-TO-END ENCRYPTION',
+            'Nothing on this page is saved yet',
             style: GoogleFonts.inter(
               color: const Color(0xFF94A3B8),
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.0,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

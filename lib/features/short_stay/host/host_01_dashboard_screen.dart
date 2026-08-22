@@ -31,6 +31,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../services/host_fcm_service.dart';
 import '../../../theme/goouts_colors.dart';
 import '../services/stay_host_service.dart';
 import 'host_routes.dart';
@@ -62,6 +63,22 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
   @override
   void initState() {
     super.initState();
+
+    // ── THE ONLY PLACE THE NOTIFICATION PERMISSION IS ASKED FOR ───────────
+    //
+    // Post login, post first frame, and nowhere else.
+    //
+    // requestPermission() internally calls registerForRemoteNotifications(),
+    // which this app's AppDelegate ALREADY calls at startup for Firebase
+    // Phone Auth. Calling it during app startup causes a second APNs
+    // registration and an iOS crash with no useful stack — crash type C in
+    // memory_claud/ios_firebase_phone_auth_crash_fix.md, thirteen builds of
+    // driver_app to find. Here, after the dashboard has drawn, it is safe.
+    //
+    // Fire and forget. A host who declines still gets a working dashboard.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      HostFcmService.instance.askPermission();
+    });
     _loadRequests();
   }
 
@@ -678,6 +695,11 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
           HostRoutes.calendar),
       _QuickAction('Booking requests', Icons.mark_email_unread_outlined,
           HostRoutes.requests),
+      // Guest conversations. NOT HostRoutes.messageCenter — that is GoOuts
+      // support, a different inbox entirely, and the two were one tap apart
+      // in the app bar with nothing distinguishing them.
+      _QuickAction('Message guests', Icons.chat_bubble_outline_rounded,
+          HostRoutes.messaging),
       _QuickAction('Payout details', Icons.account_balance_outlined,
           HostRoutes.payoutDetails),
       _QuickAction('Help centre', Icons.help_outline_rounded, HostRoutes.help),

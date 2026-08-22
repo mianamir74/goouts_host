@@ -263,6 +263,40 @@ class HostBookingDetailsScreen extends StatelessWidget {
               ),
             ),
           ]),
+        // ── MESSAGE THE GUEST ─────────────────────────────────────────────
+        //
+        // Offered on confirmed AND pending bookings, unlike the photograph
+        // step above. A host deciding whether to accept a request very often
+        // needs to ask something first, and the request screen gives them
+        // Accept or Decline and nothing in between.
+        if (status == 'confirmed' || status == 'pending')
+          _section('Messages', <Widget>[
+            Text(
+              status == 'pending'
+                  ? 'Ask your guest anything you need to know before you '
+                    'accept. They see this in their GoOuts app.'
+                  : 'Arrange arrival times and key collection here. Messages '
+                    'cannot be edited or deleted afterwards, by either of you.',
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: GoOutsColors.body, height: 1.45),
+            ),
+            const SizedBox(height: 12),
+            Builder(
+              builder: (context) => OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).pushNamed(
+                  HostRoutes.guestThread,
+                  arguments: id,
+                ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                label: const Text('Message your guest'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  foregroundColor: GoOutsColors.primary,
+                  side: const BorderSide(color: GoOutsColors.primary),
+                ),
+              ),
+            ),
+          ]),
         _section('Reference', <Widget>[
           _row('Booking', (b['bookingId'] ?? '').toString()),
           _row('Property', (b['listingId'] ?? '').toString()),

@@ -50,6 +50,13 @@ class _NotificationSettingsScreenState
       'Booking requests',
       'When a guest asks to stay.',
     ],
+    // ⚠ THE KEY IS 'guestMessages' AND notifyOnStayMessage READS EXACTLY THAT
+    // string from stay_hosts/{uid}.notificationPrefs. Renaming it here without
+    // renaming it there silently opts every host back in.
+    'guestMessages': <String>[
+      'Guest messages',
+      'When a guest writes to you about a booking.',
+    ],
     'bookingChanges': <String>[
       'Changes and cancellations',
       'When a confirmed booking is cancelled or altered.',
@@ -186,11 +193,12 @@ class _NotificationSettingsScreenState
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'GoOuts Host does not send notifications yet. '
-                              'Your choices here are saved and will be used '
-                              'when it does — but for now, check the app for '
-                              'new booking requests rather than waiting to be '
-                              'told.',
+                              'Guest messages are the only notification '
+                              'GoOuts Host sends so far. The other choices '
+                              'here are saved and will be used when those '
+                              'notifications are built — until then, check '
+                              'the app for new booking requests rather than '
+                              'waiting to be told.',
                               style: GoogleFonts.inter(
                                   fontSize: 13,
                                   color: GoOutsColors.body,

@@ -22,6 +22,7 @@ import 'host_19_claim_details_screen.dart';
 import 'host_20_earnings_screen.dart';
 import 'host_21_help_centre_screen.dart';
 import 'host_22_guest_messaging_screen.dart';
+import 'host_22b_guest_thread_screen.dart';
 import 'host_23_notification_settings_screen.dart';
 import 'host_24_profile_screen.dart';
 import 'host_25_property_analytics_screen.dart';
@@ -105,6 +106,8 @@ class HostRoutes {
   static const earnings       = '/host/earnings';
   static const analytics      = '/host/analytics';
   static const messaging      = '/host/messages';
+  // One conversation, argument is the booking id. `messaging` is the list.
+  static const guestThread    = '/host/messages/guest';
   static const help           = '/host/help';
   static const messages       = '/host/messages/support';
   static const changePin      = '/host/profile/pin';
@@ -134,7 +137,7 @@ class HostRoutes {
     newLegal, payoutDetails,
     calendar, requests, pricingAlert, booking, preArrival,
     makeClaim, claimStatus, claimDetails,
-    earnings, analytics, messaging, help, notifications, profile,
+    earnings, analytics, messaging, guestThread, help, notifications, profile,
     messages, changePin, contactSupport, messageCenter, appSettings,
     notificationFeed,
   };
@@ -172,6 +175,7 @@ class HostRoutes {
           earnings       => const HostEarningsScreen(),
           analytics      => const PropertyAnalyticsScreen(),
           messaging      => const GuestMessagingScreen(),
+          guestThread    => const GuestThreadScreen(),
           help           => const HelpCentreScreen(),
           messages       => const HostSupportTicketsScreen(),
           changePin      => const HostChangePinScreen(),

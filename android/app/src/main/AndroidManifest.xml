@@ -1,4 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Added 21 August 2026 with firebase_messaging.
+
+      REQUIRED ON ANDROID 13 (API 33) AND ABOVE. Without this line the runtime
+      permission request returns "denied" immediately, with no dialog and no
+      error — the host is never asked, never notified, and nothing anywhere
+      says why. Older Android grants notifications at install time and ignores
+      this declaration, so it is safe on every version.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:label="GoOuts Host"
         android:name="${applicationName}"
