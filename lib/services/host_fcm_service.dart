@@ -160,7 +160,12 @@ class HostFcmService {
     try {
       final NotificationSettings s = await _messaging.getNotificationSettings();
       if (!_granted(s)) return false;
-      return _fetchAndSave();
+      // ⚠ AWAITED. `return _fetchAndSave();` lets the Future escape the try
+      // before it completes, so a failure inside it would be thrown to the
+      // caller instead of caught below — defeating the entire point of a
+      // method whose job is to fail quietly. Caught by CI as
+      // unawaited_return_in_try_block, which is a warning and should be.
+      return await _fetchAndSave();
     } catch (e) {
       debugPrint('host fcm: status read failed — $e');
       return false;
@@ -177,7 +182,8 @@ class HostFcmService {
     try {
       final NotificationSettings s = await _messaging.requestPermission();
       if (!_granted(s)) return false;
-      return _fetchAndSave();
+      // Awaited for the same reason as above.
+      return await _fetchAndSave();
     } catch (e) {
       debugPrint('host fcm: askPermission failed — $e');
       return false;
