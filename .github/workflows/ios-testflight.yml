@@ -71,8 +71,23 @@ jobs:
       # alone would do. Both are kept: the exclude protects local runs, and
       # running first means a genuine code error costs two minutes instead of
       # twenty-five.
+      # ── ⚠ --no-fatal-infos, ADDED 24 August 2026 ─────────────────────────
+      #
+      # Bare `flutter analyze` exits 1 on ANY issue, including infos. An info
+      # is a style suggestion — "use '_' instead of '__'", "this import is
+      # redundant" — and none of them can make an app misbehave.
+      #
+      # So this step was failing the build, and the release, over formatting
+      # opinions, while goouts_app's own workflow has always run
+      # `--no-fatal-infos`. THE SAME CODE PASSED IN ONE REPO AND FAILED IN
+      # ANOTHER, which is the worst version of a red X: it looks like a real
+      # regression and it is a difference in two YAML files.
+      #
+      # ⚠ THIS STILL FAILS ON WARNINGS AND ERRORS. It has to. An unawaited
+      # Future or a dead null check is a defect, and one of those has already
+      # cost this project a build. Only the cosmetic tier is downgraded.
       - name: Analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
 
       - name: Install Codemagic CLI tools
         run: pipx install codemagic-cli-tools

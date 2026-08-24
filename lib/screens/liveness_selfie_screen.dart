@@ -518,7 +518,7 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
               Center(
                 child: ValueListenableBuilder<LivenessRingState>(
                   valueListenable: ring.state,
-                  builder: (_, LivenessRingState st, __) {
+                  builder: (_, LivenessRingState st, Widget? child) {
                     if (st == LivenessRingState.complete ||
                         st == LivenessRingState.timedOut) {
                       return const SizedBox.shrink();
@@ -531,13 +531,13 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
                           children: <Widget>[
                             ValueListenableBuilder<List<bool>>(
                               valueListenable: ring.lit,
-                              builder: (_, List<bool> lit, __) =>
+                              builder: (_, List<bool> lit, Widget? child) =>
                                   LivenessRing(lit: lit),
                             ),
                             if (st == LivenessRingState.countdown)
                               ValueListenableBuilder<int>(
                                 valueListenable: ring.count,
-                                builder: (_, int n, __) => Text(
+                                builder: (_, int n, Widget? child) => Text(
                                   '$n',
                                   style: const TextStyle(
                                     fontSize: 72,
@@ -566,7 +566,7 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
                         const SizedBox(height: 18),
                         ValueListenableBuilder<List<bool>>(
                           valueListenable: ring.lit,
-                          builder: (_, List<bool> lit, __) =>
+                          builder: (_, List<bool> lit, Widget? child) =>
                               LivenessArrows(lit: lit),
                         ),
                       ],
@@ -587,19 +587,19 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
                 right: 20,
                 child: ValueListenableBuilder<LivenessRingState>(
                   valueListenable: ring.state,
-                  builder: (_, LivenessRingState st, __) {
+                  builder: (_, LivenessRingState st, Widget? child) {
                     if (ring.failureReason.value.isNotEmpty) {
                       return const SizedBox.shrink();
                     }
                     final bool sweeping = st != LivenessRingState.complete;
                     return ValueListenableBuilder<bool>(
                       valueListenable: auto.gaveUp,
-                      builder: (_, bool up, __) {
+                      builder: (_, bool up, Widget? child) {
                         if (up) return const SizedBox.shrink();
                         return ValueListenableBuilder<String>(
                           valueListenable:
                               sweeping ? ring.hint : auto.guidance,
-                          builder: (_, String msg, __) => _pill(msg),
+                          builder: (_, String msg, Widget? child) => _pill(msg),
                         );
                       },
                     );
@@ -618,7 +618,7 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
                 bottom: 24,
                 child: ValueListenableBuilder<LivenessRingState>(
                   valueListenable: ring.state,
-                  builder: (_, LivenessRingState st, __) {
+                  builder: (_, LivenessRingState st, Widget? child) {
                     if (st != LivenessRingState.ready) {
                       return const SizedBox.shrink();
                     }
@@ -646,7 +646,7 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
                 bottom: 92,
                 child: ValueListenableBuilder<String>(
                   valueListenable: ring.failureReason,
-                  builder: (_, String reason, __) {
+                  builder: (_, String reason, Widget? child) {
                     if (reason.isEmpty) return const SizedBox.shrink();
                     return Container(
                       padding: const EdgeInsets.all(14),

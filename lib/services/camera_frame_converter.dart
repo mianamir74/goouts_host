@@ -24,7 +24,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' show Size;
 
 import 'package:camera/camera.dart';
