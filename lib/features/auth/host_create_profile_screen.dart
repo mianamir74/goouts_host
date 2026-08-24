@@ -3,6 +3,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../../services/image_orientation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,12 +15,19 @@ import '../short_stay/host/host_collection.dart';
 import '../home/host_home_screen.dart';
 
 class HostCreateProfileScreen extends StatefulWidget {
-  const HostCreateProfileScreen({super.key, this.selfieScores});
+  const HostCreateProfileScreen({super.key, this.selfieScores, this.selfieAdvice});
 
   /// Scores for the selfie taken on the previous screen. Null if the host
   /// reached here another way — the engine then treats the selfie as neutral
   /// rather than as a failure, because "not measured" is not "bad".
   final Map<String, dynamic>? selfieScores;
+
+  /// The quality warning shown when an imperfect selfie was accepted anyway.
+  ///
+  /// ⚠ ADVISORY. It records that the phone was unhappy so a human reviewer
+  /// looks harder. It must never drive an automatic decision — it is written
+  /// by the client and would be trivial to forge.
+  final String? selfieAdvice;
 
   @override
   State<HostCreateProfileScreen> createState() => _HostCreateProfileScreenState();
@@ -43,14 +52,18 @@ class _HostCreateProfileScreenState extends State<HostCreateProfileScreen> {
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked =
-        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+        await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
       // The gallery is a separate system UI. Presenting it can push this app
       // to the background, and a low memory device may unload the screen
       // behind it, so this State can be gone by the time the user has picked.
       if (!mounted) return;
+      // A gallery photograph carries the same EXIF tag as a camera one — it
+      // is usually the same photograph. Normalised for the same reason.
+      final String uprightPath = await normaliseOrientation(picked.path);
+      if (!mounted) return;
       setState(() {
-        _profileImage = File(picked.path);
+        _profileImage = File(uprightPath);
         _hasPhoto = true;
       });
     }
@@ -129,9 +142,25 @@ class _HostCreateProfileScreenState extends State<HostCreateProfileScreen> {
     if (source == null || !mounted) return;
 
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source, imageQuality: 90);
+    // ⚠ NO imageQuality / maxWidth — see the note in business_registration_
+    // screen.dart. The re-encode drops the EXIF orientation without rotating
+    // the pixels, and a sideways ID fails the aspect-ratio check. The resize
+    // happens in normaliseOrientation, after the rotation is baked in.
+    final picked = await picker.pickImage(source: source);
     if (picked == null) return;
     if (!mounted) return;   // see _pickImage above
+
+    // ── ⚠ ORIENTATION FIRST. See services/image_orientation.dart. ─────────
+    //
+    // Same fault as the selfie, and worse here: an ID photographed upright
+    // and stored on its side is one an admin has to tilt their head to read,
+    // and the sharpness and aspect-ratio checks below measure the WRONG
+    // dimension on a rotated card — a perfectly framed passport can be
+    // refused for being the wrong shape.
+    //
+    // Returns the original path on failure and never throws.
+    final String uprightPath = await normaliseOrientation(picked.path);
+    if (!mounted) return;
 
     // ── VALIDATE BEFORE ACCEPTING ────────────────────────────────────────
     //
@@ -145,7 +174,7 @@ class _HostCreateProfileScreenState extends State<HostCreateProfileScreen> {
     // the document is still on the desk in front of them, costs four seconds
     // instead of a support ticket.
     final Map<String, dynamic> check =
-        await DocumentQualityInspector().inspectDocument(picked.path);
+        await DocumentQualityInspector().inspectDocument(uprightPath);
     if (!mounted) return;
 
     if (check['isValid'] != true) {
@@ -163,11 +192,11 @@ class _HostCreateProfileScreenState extends State<HostCreateProfileScreen> {
 
     setState(() {
       if (isFront) {
-        _kycFrontImage = File(picked.path);
+        _kycFrontImage = File(uprightPath);
         _kycFrontScores =
             Map<String, dynamic>.from(check['scores'] as Map? ?? const {});
       } else {
-        _kycBackImage = File(picked.path);
+        _kycBackImage = File(uprightPath);
         _kycBackScores =
             Map<String, dynamic>.from(check['scores'] as Map? ?? const {});
       }
@@ -265,6 +294,8 @@ class _HostCreateProfileScreenState extends State<HostCreateProfileScreen> {
           .httpsCallable('kycAutoDecision')
           .call(<String, dynamic>{
         'selfieScores': selfieScores,
+        if (widget.selfieAdvice != null)
+          'selfieAdvice': widget.selfieAdvice,
         'documentScores': documentScores,
         'profileCompleteness': profileCompleteness,
         'documentType': _selectedDocType,

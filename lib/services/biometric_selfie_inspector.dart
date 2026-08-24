@@ -45,7 +45,29 @@ class BiometricSelfieInspector {
   static const double _maxBrightness    = 220.0;
   static const double _idealBrightness  = 130.0; // photometric ideal
   static const int    _minFileSizeBytes = 40000;  // 40 KB minimum
-  static const int    _idealFileSize    = 250000; // 250 KB = ideal quality
+
+  /// File size at which fileQuality reaches 1.0.
+  ///
+  /// ── ⚠ RECALIBRATED 24 August 2026. 250 KB WAS MEASURED ON A DIFFERENT
+  ///    PIPELINE AND SILENTLY BECAME UNREACHABLE. ─────────────────────────────
+  ///
+  /// fileQuality is fileSize / this, clamped. 250 KB was chosen when the file
+  /// reaching here was the camera's own output — an iPhone selfie of 1.5 to 3
+  /// MB, which clamps to 1.0 without trying.
+  ///
+  /// normaliseOrientation now sits in front of this: it re-encodes at quality
+  /// 90 and caps the longest edge at 1600px, so the same selfie arrives at
+  /// roughly 150–250 KB. Against a 250 KB ideal that is a fileQuality of 0.6 to
+  /// 1.0 instead of a certain 1.0 — a real drop in the auto-approval score,
+  /// caused by a change that had nothing to do with quality and everything to
+  /// do with rotation.
+  ///
+  /// ⚠ THE FLOOR ABOVE IS THE ACTUAL PROTECTION. _minFileSizeBytes rejects
+  /// genuine rubbish outright. This constant only decides where a good file
+  /// stops earning more credit for being bigger, and a well compressed sharp
+  /// image is not worse than a bloated one — sharpness is measured directly,
+  /// on its own, at more than twice this weight.
+  static const int    _idealFileSize    = 120000; // 120 KB, post-normalisation
 
   /// Inspects selfie and returns confidence scores for each signal.
   ///
@@ -90,6 +112,8 @@ class BiometricSelfieInspector {
     if (original == null) {
       return {
         'isValid': false,
+        // Nothing decodable here at all. Genuinely unusable.
+        'blocking': true,
         'errorMessage': 'Could not read selfie. Please retake.',
         'scores': scores,
       };
@@ -148,6 +172,12 @@ class BiometricSelfieInspector {
         scores['overall'] = 0.0;
         return {
           'isValid': false,
+          // ⚠ ONLY "no face" AND "more than one face" STOP THE FLOW.
+          // Pose, size, eyes and occlusion are advice — see the note on
+          // FaceCheckResult.blocking. A good selfie was being refused ten
+          // times in a row because the size check and the on-screen bracket
+          // measured different things.
+          'blocking': faceResult.blocking,
           'errorMessage': faceResult.errorMessage ??
               'We could not verify your face in that photo. Please retake it.',
           'scores': scores,

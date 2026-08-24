@@ -18,11 +18,15 @@ import 'package:image_picker/image_picker.dart';
 // legal_documents/host_legal, a collection readable before sign-in.
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_host/features/common/goouts_sheet.dart';
-import 'package:goouts_host/services/biometric_selfie_inspector.dart';
+// biometric_selfie_inspector and image_orientation are no longer imported here.
+// Both now run INSIDE LivenessSelfieScreen, on the frame it captured, before it
+// hands the path back. Running them again here would re-encode an already
+// compressed JPEG for no new information.
 
 import '../short_stay/host/host_collection.dart';
 import 'host_create_profile_screen.dart';
 import 'host_pin_credential.dart';
+import '../../screens/liveness_selfie_screen.dart';
 
 class BusinessRegistrationScreen extends StatefulWidget {
   const BusinessRegistrationScreen({
@@ -49,7 +53,11 @@ class _BusinessRegistrationScreenState
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final AddressLookupService _addressService = AddressLookupService();
-  final ImagePicker _imagePicker = ImagePicker();
+  // ⚠ THE ImagePicker FIELD WAS REMOVED 24 August 2026. The selfie now comes
+  // from LivenessSelfieScreen, which owns its own camera. The image_picker
+  // import stays because XFile comes from it and _selfieImage is still an
+  // XFile — removing that import breaks the build in a way that reads as
+  // unrelated.
 
   final List<String> _prefixOptions = <String>['Mr', 'Mrs', 'Miss', 'Ms', 'Dr'];
   final List<String> _countryOptions = <String>[
@@ -175,6 +183,20 @@ class _BusinessRegistrationScreenState
   /// free to clear.
   Map<String, dynamic>? _selfieScores;
 
+  /// The quality warning shown when an imperfect selfie was accepted anyway.
+  /// Stored with the record so the admin review sheet can show what the phone
+  /// thought. Null when the photo passed cleanly.
+  String? _selfieAdvice;
+
+  /// Whether the head-sweep liveness check completed, and why it did not.
+  ///
+  /// ⚠ NOT A PASS/FAIL. false means the ring ran out of time and the photo was
+  /// taken regardless — the app assists, the admin judges. It is written to the
+  /// record so a reviewer knows whether to look harder, which is exactly the
+  /// information a "verified" flag alone destroys.
+  bool _livenessComplete = false;
+  String _livenessNote = '';
+
   @override
   void initState() {
     super.initState();
@@ -296,58 +318,74 @@ class _BusinessRegistrationScreenState
         _isPickingSelfie = true;
       });
 
-      final XFile? pickedImage = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.front,
-        imageQuality: 85,
-        maxWidth: 1200,
-      );
+      // ── ⚠ THE LIVE CAMERA REPLACED image_picker HERE, 24 August 2026 ───────
+      //
+      // What was here: _imagePicker.pickImage(source: camera), which hands the
+      // job to the phone's own camera app. You get one finished photograph and
+      // no say in it — no guidance while the person frames themselves, no way
+      // to check anything before the shutter, and no frames at all with which
+      // to watch a head turn.
+      //
+      // The consequence was the flow this whole screen kept fighting: judge the
+      // photo AFTER the fact, and tell somebody "retake" with nothing to aim
+      // at. People asked to retake are far more likely to abandon the
+      // application than to succeed on the second try.
+      //
+      // LivenessSelfieScreen runs the same checks on the LIVE PREVIEW, guides
+      // while it can still be acted on, proves the face is a real one by
+      // watching it turn, and fires the shutter itself once the framing already
+      // passes. The photograph then passes by construction, because the gate
+      // that takes it is the code that validates it.
+      //
+      // ⚠ IT RETURNS THE FINISHED ARTICLE. The path is already upright,
+      // downscaled and inspected — normaliseOrientation and
+      // BiometricSelfieInspector both run inside that screen. Do NOT run them
+      // again here; a second re-encode of an already compressed JPEG is where a
+      // face turns mushy, and it would double the work for no new information.
+      final LivenessSelfieResult? shot =
+          await LivenessSelfieScreen.open(context);
 
       if (!mounted) {
         return;
       }
 
-      if (pickedImage != null) {
-        // ── CHECK THE FACE BEFORE ACCEPTING THE PHOTO ────────────────────
+      // null means they backed out without taking one. Not an error, not a
+      // refusal — nothing happened and nothing should be said about it.
+      if (shot != null) {
+        // Imperfect but usable. Say so once, then carry on — they are not
+        // being asked to do anything about it.
         //
-        // Added 13 August 2026. Until now the host's selfie was captured and
-        // uploaded with NO validation at all — not even the brightness and
-        // blur checks the consumer and driver apps had. Whatever the camera
-        // returned went straight to Storage and an admin eyeballed it days
-        // later, if they looked at all.
-        //
-        // Now ML Kit answers the only question that matters before the photo
-        // is kept: is there one person in this, facing the camera, eyes open,
-        // face not covered. A wall, a shoe or a ceiling is refused here.
-        //
-        // Nothing biometric is stored — the detector returns numbers and the
-        // face data is discarded. See services/face_check_service.dart.
-        final Map<String, dynamic> check =
-            await BiometricSelfieInspector().inspectSelfie(pickedImage.path);
-        if (!mounted) {
-          return;
-        }
-
-        if (check['isValid'] != true) {
+        // ⚠ THE BLOCKING CASE NEVER REACHES HERE. LivenessSelfieScreen keeps
+        // scanning rather than returning when a photograph has no usable face
+        // in it, so anything that arrives has already cleared that bar. There
+        // is no "retake your selfie" dialog any more because there is nothing
+        // left for it to refuse.
+        if (shot.advice != null) {
           await GoOutsSheet.warning(
             context,
-            title: 'Retake your selfie',
-            message: (check['errorMessage'] as String?) ??
-                'That photo could not be used. Please take it again.',
+            title: 'Selfie saved',
+            message: '${shot.advice}\n\nWe have kept this photo and it will go '
+                'for review. You can retake it now if you would rather.',
           );
           if (!mounted) {
             return;
           }
-          // Deliberately NOT stored. Keeping a refused selfie would let the
-          // host tap Continue with a photo we have already rejected.
-          return;
         }
 
         setState(() {
-          _selfieImage = pickedImage;
+          _selfieImage = XFile(shot.path);
+          _selfieAdvice = shot.advice;
           _showSelfieError = false;
-          _selfieScores =
-              Map<String, dynamic>.from(check['scores'] as Map? ?? const {});
+          _selfieScores = Map<String, dynamic>.from(shot.scores);
+          // ── ⚠ THE LIVENESS VERDICT TRAVELS WITH THE PHOTO ───────────────
+          //
+          // False means the ring did not close and the photograph was taken
+          // anyway. That is NOT a rejection — the app assists and the admin
+          // judges — but a reviewer who knows the movement check did not
+          // finish knows to look harder at the picture, and one who is never
+          // told cannot.
+          _livenessComplete = shot.livenessComplete;
+          _livenessNote = shot.livenessNote;
         });
       }
     } catch (e) {
@@ -823,6 +861,22 @@ class _BusinessRegistrationScreenState
         'referralCode': ownReferralCode,
         'profilePhotoUrl': profilePhotoUrl,
         'selfieUrl': profilePhotoUrl,
+        // ── WHAT THE PHONE THOUGHT OF THE SELFIE ──────────────────────────
+        //
+        // ⚠ ADVISORY, NEVER A DECISION. These are written by the client and
+        // would be trivial to forge, so nothing automated may key off them.
+        // They exist so a reviewer looking at the photograph knows whether the
+        // device was happy with it — the difference between a considered
+        // approval and a blind one.
+        //
+        // livenessComplete false means the head-sweep ran out of time and the
+        // photo was taken anyway. NOT a rejection. livenessNote carries the
+        // same sentence the host was shown, so a reviewer reading "turned left
+        // but not right" knows the check was incomplete rather than failed.
+        'livenessComplete': _livenessComplete,
+        if (_livenessNote.isNotEmpty) 'livenessNote': _livenessNote,
+        if (_selfieAdvice != null) 'selfieAdvice': _selfieAdvice,
+        if (_selfieScores != null) 'selfieScores': _selfieScores,
         'businessProfileVerificationStatus': 'submitted',
         'businessProfileVerificationBackendStatus': 'submitted',
         'businessProfileVerificationSubmittedAt': FieldValue.serverTimestamp(),
@@ -949,6 +1003,9 @@ class _BusinessRegistrationScreenState
         MaterialPageRoute<void>(
           builder: (_) => HostCreateProfileScreen(
             selfieScores: _selfieScores,
+            // Carried so the admin review sheet can say what the phone
+            // thought of a selfie that was accepted despite a warning.
+            selfieAdvice: _selfieAdvice,
           ),
         ),
         (Route<dynamic> route) => false,

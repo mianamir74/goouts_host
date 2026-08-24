@@ -11,6 +11,21 @@
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- ⚠ ADDED 24 August 2026, REQUIRED BY THE LIVE KYC PREVIEW.
+
+         Until now this app only used image_picker, which hands the job to the
+         phone's own camera app and therefore needs no permission of its own —
+         which is why this line was never here.
+
+         The camera package is different: it opens the hardware in-process for
+         the auto-capture and liveness preview, and without this it throws
+         CameraAccessDenied at the moment the selfie step opens.
+
+         android:required="false" so the app still installs on a device with no
+         camera. The selfie step needs one; the rest of the app does not. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
         android:label="GoOuts Host"
         android:name="${applicationName}"

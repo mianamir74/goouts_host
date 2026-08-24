@@ -63,18 +63,56 @@
 //   ML Kit ran and found NO   -> fail CLOSED. That is a definitive answer and
 //   face, or a bad one           it is the whole point of this file.
 import 'dart:math' as math;
+import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 class FaceCheckResult {
   const FaceCheckResult({
+    this.yaw,
+    this.blocking = false,
     required this.available,
     required this.isValid,
     this.errorMessage,
     this.scores = const <String, double>{},
     this.faceCount = 0,
+    this.faceBox,
   });
+
+  /// TRUE only when the photograph cannot be used AT ALL — no face in it, or
+  /// more than one person. Everything else (pose, size, eyes, lighting,
+  /// sharpness) is ADVICE.
+  ///
+  /// ── WHY, 22 August 2026 ──────────────────────────────────────────────────
+  ///
+  /// A well lit, centred, straight-on selfie was refused ten times running.
+  /// The face filled the on-screen bracket exactly as instructed, but the size
+  /// check measures the face against the WHOLE frame and the bracket is only
+  /// the middle of it — so "fill the box" and "pass the check" were different
+  /// things and nothing on screen said so.
+  ///
+  /// Industry data is unambiguous about the cost of that: people asked to
+  /// retake are three times more likely to abandon, and most give up on any
+  /// verification that runs past three minutes. An app that refuses a good
+  /// photograph is worse than one that accepts a mediocre one, because a
+  /// mediocre photograph reaches an admin who can look at it and decide.
+  ///
+  /// So the app now ASSISTS rather than JUDGES. The score still travels with
+  /// the record and the admin still sees it — the decision simply moved to
+  /// the person qualified to make it.
+  final bool blocking;
+
+  /// Head rotation left/right in degrees, or null when ML Kit did not report
+  /// it. Positive is looking to the camera's right.
+  ///
+  /// ⚠ NULL IS NOT ZERO. Google's own documentation is explicit that the Euler
+  /// angles come back null when performanceMode is fast AND landmarks and
+  /// classification are both off. Our live detector enables both, so it is
+  /// populated — but anything reading this must treat null as "not measured"
+  /// and stop, never as "facing straight ahead". A liveness ring that treats
+  /// null as 0 sits at dead centre for ever and never fills.
+  final double? yaw;
 
   /// False when ML Kit itself could not run. The caller should ignore this
   /// result entirely rather than treat it as a failed check.
@@ -87,6 +125,15 @@ class FaceCheckResult {
   final Map<String, double> scores;
 
   final int faceCount;
+
+  /// Where the face is, as FRACTIONS of the frame (0..1), not pixels.
+  ///
+  /// Normalised on purpose. The preview widget, the camera stream and the
+  /// saved photo are three different pixel sizes; a rect in any one of them is
+  /// wrong in the other two. Fractions survive the trip.
+  ///
+  /// Null when no face was found, or when ML Kit is unavailable.
+  final Rect? faceBox;
 
   double get overall => scores['overall'] ?? 0.0;
 
@@ -169,11 +216,49 @@ class FaceCheckService {
       final List<Face> faces =
           await detector.processImage(InputImage.fromFilePath(imagePath));
 
+      return evaluate(faces, imageWidth, imageHeight);
+    } catch (e) {
+      // ML Kit itself failed — Play Services missing, model not downloaded,
+      // unsupported device. Fail OPEN. See the failure policy at the top.
+      debugPrint('FaceCheckService: unavailable, falling back — $e');
+      return FaceCheckResult.unavailable;
+    } finally {
+      // MUST close. The detector holds a native model; leaking one per selfie
+      // is a memory leak on the platform that can least afford it.
+      try {
+        await detector?.close();
+      } catch (_) {}
+    }
+  }
+
+  /// Judges an already-detected face. Pure — no camera, no file, no I/O.
+  ///
+  /// ── WHY THIS IS SEPARATE ─────────────────────────────────────────────────
+  ///
+  /// 20 August 2026, reported as "I tried ten times and it would not take my
+  /// selfie".
+  ///
+  /// The old flow was: take the photo, THEN judge it, then say "Please retake."
+  /// The person is asked to guess, shoot, and be told no, with nothing to aim
+  /// at in between.
+  ///
+  /// The fix is to run these same checks on the live preview and fire the
+  /// shutter only once they already pass. For that to be true rather than
+  /// nearly true, the live gate and the final judgement must be THE SAME CODE.
+  /// Two copies of "is this a good selfie" would drift, and the drift would
+  /// show up as a shutter that fires and a photo that is then rejected — worse
+  /// than what it replaced, because now the app looks broken rather than fussy.
+  ///
+  /// So: one evaluator, two callers.
+  FaceCheckResult evaluate(List<Face> faces, int imageWidth, int imageHeight) {
+    try {
       // ── No face. The bug this file was written for. ────────────────────
       if (faces.isEmpty) {
         return const FaceCheckResult(
           available: true,
           isValid: false,
+          // The one genuine hard stop: there is nobody in this photograph.
+          blocking: true,
           errorMessage:
               "We couldn't find a face in that photo. Hold the phone at arm's "
               'length, look straight at the camera and take it again.',
@@ -191,6 +276,7 @@ class FaceCheckService {
           available: true,
           isValid: false,
           faceCount: faces.length,
+          blocking: true,
           errorMessage:
               'More than one person is in the photo. Take it again with only '
               'yourself in the frame.',
@@ -199,6 +285,18 @@ class FaceCheckService {
       }
 
       final Face face = faces.first;
+
+      // Normalised once, then handed to every result below so the live UI can
+      // draw where the face actually is while the checks are still failing —
+      // which is the whole point of guiding rather than judging.
+      final Rect? box = (imageWidth > 0 && imageHeight > 0)
+          ? Rect.fromLTWH(
+              face.boundingBox.left / imageWidth,
+              face.boundingBox.top / imageHeight,
+              face.boundingBox.width.abs() / imageWidth,
+              face.boundingBox.height.abs() / imageHeight,
+            )
+          : null;
 
       // ── Signal 1: how much of the frame the face fills ─────────────────
       final double imageArea = (imageWidth * imageHeight).toDouble();
@@ -212,6 +310,7 @@ class FaceCheckService {
           available: true,
           isValid: false,
           faceCount: 1,
+          faceBox: box,
           errorMessage:
               'Your face is too small in the photo. Move closer and take it '
               'again.',
@@ -235,16 +334,17 @@ class FaceCheckService {
       final double? roll = face.headEulerAngleZ;
 
       if (yaw != null && yaw.abs() > _maxYaw) {
-        return _poseFailure(areaRatio, sizeScore);
+        return _poseFailure(areaRatio, sizeScore, box);
       }
       if (pitch != null && pitch.abs() > _maxPitch) {
-        return _poseFailure(areaRatio, sizeScore);
+        return _poseFailure(areaRatio, sizeScore, box);
       }
       if (roll != null && roll.abs() > _maxRoll) {
         return FaceCheckResult(
           available: true,
           isValid: false,
           faceCount: 1,
+          faceBox: box,
           errorMessage:
               'Your head is tilted. Hold the phone level and take it again.',
           scores: <String, double>{'faceSize': sizeScore, 'overall': 0.0},
@@ -268,6 +368,7 @@ class FaceCheckService {
             available: true,
             isValid: false,
             faceCount: 1,
+          faceBox: box,
             errorMessage:
                 'Your eyes look closed. Keep both eyes open and take it again.',
             scores: <String, double>{
@@ -299,6 +400,7 @@ class FaceCheckService {
           available: true,
           isValid: false,
           faceCount: 1,
+          faceBox: box,
           errorMessage:
               'Part of your face is covered. Remove anything over your face '
               'and take it again.',
@@ -326,7 +428,9 @@ class FaceCheckService {
       return FaceCheckResult(
         available: true,
         isValid: true,
+        yaw: yaw,
         faceCount: 1,
+        faceBox: box,
         scores: <String, double>{
           'faceSize': double.parse(sizeScore.toStringAsFixed(4)),
           'pose': double.parse(poseScore.toStringAsFixed(4)),
@@ -336,24 +440,21 @@ class FaceCheckService {
         },
       );
     } catch (e) {
-      // ML Kit itself failed — Play Services missing, model not downloaded,
-      // unsupported device. Fail OPEN. See the failure policy at the top.
-      debugPrint('FaceCheckService: unavailable, falling back — $e');
+      debugPrint('FaceCheckService.evaluate failed — $e');
       return FaceCheckResult.unavailable;
-    } finally {
-      // MUST close. The detector holds a native model; leaking one per selfie
-      // is a memory leak on the platform that can least afford it.
-      try {
-        await detector?.close();
-      } catch (_) {}
     }
   }
 
-  FaceCheckResult _poseFailure(double areaRatio, double sizeScore) =>
+  FaceCheckResult _poseFailure(
+    double areaRatio,
+    double sizeScore,
+    Rect? box,
+  ) =>
       FaceCheckResult(
         available: true,
         isValid: false,
         faceCount: 1,
+        faceBox: box,
         errorMessage:
             'Please look straight at the camera and take the photo again.',
         scores: <String, double>{'faceSize': sizeScore, 'overall': 0.0},
@@ -371,5 +472,84 @@ class FaceCheckService {
             (part(pitch, _maxPitch) * 0.35) +
             (part(roll, _maxRoll) * 0.20))
         .clamp(0.0, 1.0);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LiveFaceDetector — the same checks, running on the camera preview.
+//
+//  Written 20 August 2026 for the auto-capture selfie.
+//
+//  ── WHY A SEPARATE CLASS AND NOT JUST inspectFace IN A LOOP ─────────────────
+//
+//  inspectFace builds a FaceDetector, uses it once and closes it. That is right
+//  for a single photo and ruinous at ten frames a second — each construction
+//  loads a native model.
+//
+//  This holds ONE detector open for the life of the camera screen and closes it
+//  in dispose(). It also differs from the still-photo detector in two ways, both
+//  deliberate:
+//
+//    performanceMode.fast   accurate cannot keep up with a live stream. Fast is
+//                           slightly more willing to miss a face, which costs a
+//                           frame, not a decision — another is along shortly.
+//                           See AutoSelfieController.checkEveryMs for how
+//                           shortly, which the liveness sweep changes.
+//
+//    enableTracking: true   lets ML Kit follow the same face between frames
+//                           instead of re-finding it, which is both cheaper and
+//                           steadier.
+//
+//  ⚠ THE JUDGEMENT IS NOT DUPLICATED. Both paths call FaceCheckService.evaluate.
+//  The only difference is how the frame arrives.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class LiveFaceDetector {
+  FaceDetector? _detector;
+  bool _busy = false;
+  bool _disposed = false;
+
+  /// True while a frame is being processed. The caller uses this to DROP frames
+  /// rather than queue them — a queue on a 30fps stream grows without bound and
+  /// the guidance ends up describing where the face was two seconds ago.
+  bool get isBusy => _busy;
+
+  FaceDetector _ensure() => _detector ??= FaceDetector(
+        options: FaceDetectorOptions(
+          enableClassification: true,
+          enableLandmarks: true,
+          enableContours: false,
+          enableTracking: true,
+          minFaceSize: 0.1,
+          performanceMode: FaceDetectorMode.fast,
+        ),
+      );
+
+  /// Judges one live frame. Returns null if a frame was already in flight.
+  Future<FaceCheckResult?> check(
+    InputImage image, {
+    required int imageWidth,
+    required int imageHeight,
+  }) async {
+    if (_busy || _disposed) return null;
+    _busy = true;
+    try {
+      final List<Face> faces = await _ensure().processImage(image);
+      if (_disposed) return null;
+      return FaceCheckService().evaluate(faces, imageWidth, imageHeight);
+    } catch (e) {
+      debugPrint('LiveFaceDetector: frame failed — $e');
+      return null;
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> dispose() async {
+    _disposed = true;
+    try {
+      await _detector?.close();
+    } catch (_) {}
+    _detector = null;
   }
 }

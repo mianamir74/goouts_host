@@ -20,7 +20,16 @@ class DocumentQualityInspector {
   static const double _maxBrightness    = 210.0;
   static const double _idealBrightness  = 140.0;
   static const int    _minFileSizeBytes = 60000;  // 60 KB minimum for document
-  static const int    _idealFileSize    = 400000; // 400 KB ideal
+
+  /// See the matching note in biometric_selfie_inspector — same recalibration,
+  /// same cause, 24 August 2026.
+  ///
+  /// 400 KB assumed the camera's raw 2–4 MB output. normaliseOrientation now
+  /// caps the longest edge at 1600px at quality 90, so a passport page arrives
+  /// at roughly 250–450 KB. This carries 0.15 of the document score and the
+  /// document carries 0.50 of the auto-approval decision, so an unreachable
+  /// ideal here costs more than anywhere else in the pipeline.
+  static const int    _idealFileSize    = 200000; // 200 KB, post-normalisation
   static const double _minAspectRatio   = 1.2;    // landscape document
   static const double _maxAspectRatio   = 2.2;    // widest credit-card format
 

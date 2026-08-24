@@ -72,6 +72,9 @@ dependencies:
   # every commercial SDK licences per bundle ID.
   # NOT liveness and NOT face recognition — see services/face_check_service.dart.
   google_mlkit_face_detection: ^0.13.2
+  # Live preview for the KYC selfie. The auto-capture + liveness ring read
+  # frames from this; image_picker alone can only hand back a finished photo.
+  camera: ^0.12.0+1
   path_provider: ^2.1.4
   shared_preferences: ^2.5.5
   go_router: ^17.1.0
