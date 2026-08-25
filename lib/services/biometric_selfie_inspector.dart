@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:ui' show Rect;
+
 import 'package:image/image.dart' as img;
 
 import 'face_check_service.dart';
@@ -84,6 +86,59 @@ class BiometricSelfieInspector {
   ///   }
   /// }
   /// ```
+  /// Fraction of the eye band that may be blown out before the photo is
+  /// refused.
+  ///
+  /// 0.18 from testing against a reflective pair on a real device. Below about
+  /// 0.12 ordinary skin highlights and a bright window start tripping it;
+  /// above about 0.25 a lens has to be facing a lamp head-on to fail. This is
+  /// the band where "I can see your eyes" and "I cannot" actually separate.
+  static const double _maxEyeGlare = 0.18;
+
+  /// Proportion of near-white pixels across the band where the eyes sit.
+  ///
+  /// Returns 0 when there is no face box to work from — an unmeasurable photo
+  /// must not be refused on the strength of a measurement that never happened.
+  static double _eyeGlare(img.Image image, Rect? faceBox) {
+    if (faceBox == null) return 0;
+    try {
+      // The eyes occupy roughly the upper third of a face box, and horizontally
+      // the middle 80% of it. Cropping tighter than this starts missing the
+      // eyes on a head that is slightly tilted, which would report zero glare
+      // on exactly the photographs most likely to have some.
+      final int fx = (faceBox.left * image.width).round();
+      final int fy = (faceBox.top * image.height).round();
+      final int fw = (faceBox.width * image.width).round();
+      final int fh = (faceBox.height * image.height).round();
+      if (fw <= 0 || fh <= 0) return 0;
+
+      final int x0 = (fx + fw * 0.10).round().clamp(0, image.width - 1);
+      final int x1 = (fx + fw * 0.90).round().clamp(0, image.width - 1);
+      final int y0 = (fy + fh * 0.25).round().clamp(0, image.height - 1);
+      final int y1 = (fy + fh * 0.50).round().clamp(0, image.height - 1);
+      if (x1 <= x0 || y1 <= y0) return 0;
+
+      int bright = 0;
+      int total = 0;
+      // Sampled every other pixel in both directions. A quarter of the work for
+      // a number that does not measurably change — this runs on the capture
+      // path and a full scan of a 1600px crop is dead time the user feels.
+      for (int y = y0; y < y1; y += 2) {
+        for (int x = x0; x < x1; x += 2) {
+          final img.Pixel p = image.getPixel(x, y);
+          final num lum = 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
+          if (lum > 235) bright++;
+          total++;
+        }
+      }
+      if (total == 0) return 0;
+      return bright / total;
+    } catch (_) {
+      // Never refuse a photograph because the measurement threw.
+      return 0;
+    }
+  }
+
   Future<Map<String, dynamic>> inspectSelfie(String imagePath) async {
     final scores = <String, double>{
       'fileQuality': 0.0,
@@ -180,6 +235,41 @@ class BiometricSelfieInspector {
           'blocking': faceResult.blocking,
           'errorMessage': faceResult.errorMessage ??
               'We could not verify your face in that photo. Please retake it.',
+          'scores': scores,
+        };
+      }
+
+      // ── ⚠ GLASSES: WHAT THIS ACTUALLY DETECTS, AND WHAT IT CANNOT ─────────
+      //
+      // Asked for on 24 August 2026 after a device test: "selfie doesnot
+      // continue if we have eyeglasses recognise on face".
+      //
+      // ⚠ ML KIT HAS NO GLASSES CLASSIFIER. There is no "isWearingGlasses"
+      // signal in the API, and inventing one would mean guessing. What CAN be
+      // measured is the thing that actually breaks an identity check: SPECULAR
+      // GLARE ACROSS THE EYE REGION. A lens catching the light produces a band
+      // of near-white pixels exactly where the eyes should be, and that is what
+      // stops a reviewer — or Stripe — matching a face to a passport.
+      //
+      // So this refuses reflective and tinted lenses, and lets clear thin
+      // frames through. That is deliberately the same line the UK passport
+      // rules draw: glasses are allowed, glare and tint are not.
+      //
+      // ⚠ BLOCKING, NOT ADVISORY. Every other quality signal in this file is
+      // advice, because refusing a good photograph costs more than accepting an
+      // imperfect one. This one is different: a photograph where the eyes
+      // cannot be seen is not an imperfect identity photograph, it is not an
+      // identity photograph. The message says what to do about it, and taking
+      // glasses off takes two seconds.
+      final double glare = _eyeGlare(original, faceResult.faceBox);
+      scores['eyeGlare'] = glare;
+      if (glare > _maxEyeGlare) {
+        scores['overall'] = 0.0;
+        return {
+          'isValid': false,
+          'blocking': true,
+          'errorMessage': 'Your glasses are reflecting the light and your eyes '
+              'are not visible. Please take them off and try again.',
           'scores': scores,
         };
       }

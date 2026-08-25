@@ -297,6 +297,58 @@ class HostBookingDetailsScreen extends StatelessWidget {
               ),
             ),
           ]),
+
+        // ── ⚠ THE ONLY WAY INTO THE CLAIMS FLOW. ADDED 25 August 2026. ───────
+        //
+        // Until now there was none. The three claim screens existed, had
+        // routes, and NOTHING NAVIGATED TO THEM — while the consumer app told
+        // guests in five places that a damage claim might be made against them
+        // and their arrival photographs were their evidence.
+        //
+        // ⚠ GATED ON THE CHECK-OUT DATE, NOT ON A 'completed' STATUS —
+        //   BECAUSE THERE IS NO SUCH STATUS. Found 25 August 2026.
+        //
+        // I wrote `status == 'completed'` first. It would have been a button
+        // that NEVER APPEARED, silently, for ever: grep every status a booking
+        // is ever assigned and the list is pending, confirmed, declined,
+        // cancelled. NOTHING IN THE BACKEND EVER MARKS A STAY AS FINISHED.
+        // ("Completed" exists in stay_booking.js but on a transaction record,
+        // not a booking — the same word doing two jobs.)
+        //
+        // So the honest test is the one the server uses: has the check-out
+        // date passed. That is derivable from data which definitely exists,
+        // and it matches submitStayClaim's own `now < checkOut` refusal
+        // exactly — one fact, checked the same way on both sides.
+        //
+        // ⚠ THE MISSING COMPLETION STEP IS A REAL GAP BEYOND CLAIMS. Payouts,
+        // reviews and "past stays" all want to know a stay has ended, and
+        // nothing tells them. Recorded separately.
+        if (_stayHasEnded(b['checkOut']))
+          _section('Damage', <Widget>[
+            Text(
+              'If your guest damaged the property, report it within 72 hours '
+              'of check-out. Their arrival photos are attached automatically '
+              'and your guest gets to respond before anything is decided.',
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: GoOutsColors.body, height: 1.45),
+            ),
+            const SizedBox(height: 12),
+            Builder(
+              builder: (context) => OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).pushNamed(
+                  HostRoutes.makeClaim,
+                  arguments: id,
+                ),
+                icon: const Icon(Icons.report_gmailerrorred_outlined, size: 18),
+                label: const Text('Report damage'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  foregroundColor: GoOutsColors.error,
+                  side: const BorderSide(color: GoOutsColors.error),
+                ),
+              ),
+            ),
+          ]),
         _section('Reference', <Widget>[
           _row('Booking', (b['bookingId'] ?? '').toString()),
           _row('Property', (b['listingId'] ?? '').toString()),
@@ -310,6 +362,27 @@ class HostBookingDetailsScreen extends StatelessWidget {
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
+
+  /// Has the stay finished?
+  ///
+  /// ⚠ THE ONLY HONEST TEST AVAILABLE. There is no 'completed' booking status
+  /// anywhere in this system — see the note at the claims section above. This
+  /// mirrors submitStayClaim's own `now < checkOut` refusal, so the button and
+  /// the server agree about what "finished" means.
+  ///
+  /// Returns false when checkOut is missing or unreadable, which hides the
+  /// button rather than offering a claim on a booking whose dates we cannot
+  /// establish.
+  static bool _stayHasEnded(Object? checkOut) {
+    if (checkOut is Timestamp) {
+      return DateTime.now().isAfter(checkOut.toDate());
+    }
+    if (checkOut is String && checkOut.isNotEmpty) {
+      final DateTime? d = DateTime.tryParse(checkOut);
+      return d != null && DateTime.now().isAfter(d);
+    }
+    return false;
+  }
 
   static String _day(Object? v) {
     if (v is Timestamp) {

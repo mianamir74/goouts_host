@@ -168,7 +168,14 @@ class HostRoutes {
           booking        => const HostBookingDetailsScreen(),
           preArrival     => const HostPreArrivalCaptureScreen(),
 
-          makeClaim      => const MakeClaimScreen(),
+          // ⚠ NOT const, AND IT TAKES THE BOOKING. A claim with no booking on
+          // it is not a claim — the deposit cap, the 72 hour window and the
+          // guest's evidence all come off that document. The screen falls back
+          // to reading settings.arguments so a plain pushNamed still works.
+          makeClaim      => MakeClaimScreen(
+              bookingId: settings.arguments is String
+                  ? settings.arguments as String
+                  : null),
           claimStatus    => const ClaimStatusScreen(),
           claimDetails   => const ClaimDetailsScreen(),
 

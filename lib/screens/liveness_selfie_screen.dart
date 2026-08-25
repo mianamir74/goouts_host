@@ -126,6 +126,11 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
   Future<void> _start() async {
     try {
       final List<CameraDescription> cams = await availableCameras();
+      // ⚠ GUARDED. availableCameras() takes a moment on a cold start, and this
+      // screen is one people back out of — they realise they want better light,
+      // or a call arrives. Without this, setState runs on a disposed State and
+      // on iOS that surfaces as a crash whose stack names nothing useful.
+      if (!mounted) return;
       if (cams.isEmpty) {
         setState(() => _error = 'No camera found on this device.');
         return;
@@ -192,6 +197,19 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
           // Released on BOTH outcomes. A timeout must never trap anybody.
           auto.holdShutter = false;
           auto.checkEveryMs = AutoSelfieController.framingCheckEveryMs;
+
+          // ⚠ COMPLETE MEANS TAKE IT. Releasing the shutter is not the same as
+          // firing it: the ring has just PROVEN the face is centred and held,
+          // and leaving the auto-capture controller to re-derive that through
+          // its own separate thresholds is two gates asking one question. Where
+          // they disagreed, nothing happened and the person was left pressing
+          // the button.
+          //
+          // ⚠ timedOut deliberately does NOT do this — there the head could be
+          // anywhere, so the framing gate should wait for a frame worth having.
+          if (s == LivenessRingState.complete) {
+            unawaited(auto.captureNow());
+          }
           _livenessComplete = s == LivenessRingState.complete;
           _livenessNote = ring.failureReason.value;
           if (mounted) setState(() {});
@@ -363,13 +381,21 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
               style: TextStyle(fontSize: 13.5, height: 1.5, color: Colors.grey),
             ),
             const SizedBox(height: 20),
-            _introStep(1, 'Put your face in the circle',
+            // ⚠ THIS DESCRIBES THE FLOW THAT ACTUALLY RUNS. An instruction
+            // sheet that is out of date is worse than none — the person
+            // follows it, the app does something else, and they conclude the
+            // app is broken rather than the sheet.
+            _introStep(1, 'Take your glasses off',
+                'Lenses catching the light hide your eyes, and the photo will '
+                'be refused.'),
+            _introStep(2, 'Put your face in the circle',
                 'Hold the phone at arm\'s length in good light.'),
-            _introStep(2, 'Press start, then turn your head',
+            _introStep(3, 'Press start, then turn your head',
                 'Left first, then all the way to the right. The ring fills as '
-                'you go.'),
-            _introStep(3, 'Look straight ahead',
-                'The photo is taken for you once you hold still.'),
+                'you go and the arrows show which side is done.'),
+            _introStep(4, 'Come back to the middle',
+                'Line up with the mark at the bottom of the circle and look '
+                'straight ahead. The photo is taken for you.'),
             const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
@@ -519,10 +545,10 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
                 child: ValueListenableBuilder<LivenessRingState>(
                   valueListenable: ring.state,
                   builder: (_, LivenessRingState st, Widget? child) {
-                    if (st == LivenessRingState.complete ||
-                        st == LivenessRingState.timedOut) {
-                      return const SizedBox.shrink();
-                    }
+                    // ⚠ THE CIRCLE STAYS FOR THE WHOLE STEP. It used to vanish
+                    // the moment the sweep finished, leaving the person with no
+                    // guide at the exact moment they are being asked to line up
+                    // and hold still. One shape, start to finish.
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
@@ -532,7 +558,11 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
                             ValueListenableBuilder<List<bool>>(
                               valueListenable: ring.lit,
                               builder: (_, List<bool> lit, Widget? child) =>
-                                  LivenessRing(lit: lit),
+                                  LivenessRing(
+                                lit: lit,
+                                centreActive:
+                                    st == LivenessRingState.returnToCentre,
+                              ),
                             ),
                             if (st == LivenessRingState.countdown)
                               ValueListenableBuilder<int>(
@@ -719,17 +749,46 @@ class _LivenessSelfieScreenState extends State<LivenessSelfieScreen> {
         Container(
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-          child: FilledButton(
-            onPressed: _checking ? null : _manualShutter,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(double.infinity, 54),
-              backgroundColor: _kBrand,
-              foregroundColor: Colors.white,
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-            ),
-            child: const Text('Take Selfie',
-                style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700)),
+          // ── ⚠ THE MANUAL SHUTTER IS GATED ON THE SWEEP ────────────────────
+          //
+          // It cannot be pressed until the ring has finished with the head.
+          // Before this, pressing it first skipped the movement check outright
+          // and the record still looked complete.
+          //
+          // ⚠ IT UNLOCKS ON TIMEOUT TOO, AND THAT IS THE POINT, NOT A
+          // LOOPHOLE. If the ring cannot be completed on somebody's handset,
+          // the twenty second clock releases them and this is how they finish.
+          // The record carries livenessComplete: false either way, so the admin
+          // knows. Nobody is trapped on this screen — they are slowed by twenty
+          // seconds and reported honestly.
+          child: ValueListenableBuilder<LivenessRingState>(
+            valueListenable: _ring!.state,
+            builder: (_, LivenessRingState st, Widget? child) {
+              final bool sweepDone =
+                  st == LivenessRingState.returnToCentre ||
+                      st == LivenessRingState.complete ||
+                      st == LivenessRingState.timedOut;
+              final bool enabled = sweepDone && !_checking;
+              return FilledButton(
+                onPressed: enabled ? _manualShutter : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 54),
+                  backgroundColor: _kBrand,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFD1D5DB),
+                  disabledForegroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(28)),
+                ),
+                // Saying WHY it is dead. A disabled button with no explanation
+                // is the thing people tap twice and then give up on.
+                child: Text(
+                  sweepDone ? 'Take Selfie' : 'Finish the movement check first',
+                  style: const TextStyle(
+                      fontSize: 16.5, fontWeight: FontWeight.w700),
+                ),
+              );
+            },
           ),
         ),
       ],

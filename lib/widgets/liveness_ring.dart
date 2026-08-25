@@ -29,6 +29,7 @@ class LivenessRing extends StatelessWidget {
     this.diameter = 260,
     this.ringColour = const Color(0xFF22C55E),
     this.trackColour = const Color(0x33FFFFFF),
+    this.centreActive = false,
   });
 
   /// One entry per segment, true where the head has already been.
@@ -37,6 +38,11 @@ class LivenessRing extends StatelessWidget {
   final double diameter;
   final Color ringColour;
   final Color trackColour;
+
+  /// True while the person is being asked to bring their face back to the
+  /// middle. Brightens and lengthens the centre mark so there is somewhere
+  /// specific to aim at.
+  final bool centreActive;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +54,7 @@ class LivenessRing extends StatelessWidget {
           lit: lit,
           ringColour: ringColour,
           trackColour: trackColour,
+          centreActive: centreActive,
         ),
       ),
     );
@@ -155,11 +162,13 @@ class _RingPainter extends CustomPainter {
     required this.lit,
     required this.ringColour,
     required this.trackColour,
+    this.centreActive = false,
   });
 
   final List<bool> lit;
   final Color ringColour;
   final Color trackColour;
+  final bool centreActive;
 
   /// Gap between segments, in radians. Without it the ring reads as one solid
   /// circle and the sense of "filling up piece by piece" is lost.
@@ -203,11 +212,56 @@ class _RingPainter extends CustomPainter {
         lit[i] ? on : track,
       );
     }
+
+    _paintCentreMark(canvas, rect);
+  }
+
+  /// A short tick at the bottom of the ring, marking dead centre.
+  ///
+  /// ── ⚠ WHY THE MARK IS AT THE BOTTOM AND NOT THE TOP ─────────────────────
+  ///
+  /// Because that is where a head facing forward actually sits on this ring.
+  /// The painter starts segment 0 at twelve o'clock and runs clockwise, and the
+  /// controller maps the two EXTREMES of the sweep to the two ends of that run
+  /// — so the extremes meet at the top and centre lands at six o'clock. Putting
+  /// the mark anywhere more obvious would be putting it somewhere wrong.
+  ///
+  /// ── WHY IT EXISTS AT ALL, ADDED 24 August 2026 ───────────────────────────
+  ///
+  /// Asked for directly after a device test: "give centre line to round, once
+  /// both side done with green line and face bring to centre then only auto
+  /// selfie trigger".
+  ///
+  /// The instruction "look straight at the camera" is a description of a
+  /// feeling, not a target. People overcorrect past centre and hunt around it,
+  /// because nothing on screen says where centre IS. A tick does — and it costs
+  /// one line of paint.
+  void _paintCentreMark(Canvas canvas, Rect rect) {
+    final double cx = rect.center.dx;
+    final double r = rect.width / 2;
+    final double top = rect.center.dy + r - (centreActive ? 18 : 11);
+    final double bottom = rect.center.dy + r + (centreActive ? 10 : 5);
+
+    final Paint mark = Paint()
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = centreActive ? 4 : 2.5
+      // Dim until it matters. During the sweep the person is meant to be
+      // looking AWAY from centre, and a bright marker there would be arguing
+      // with the instruction they are following.
+      ..color = centreActive
+          ? ringColour
+          : const Color(0xFFFFFFFF).withValues(alpha: 0.55);
+
+    canvas.drawLine(Offset(cx, top), Offset(cx, bottom), mark);
   }
 
   @override
   bool shouldRepaint(covariant _RingPainter old) {
     if (old.lit.length != lit.length) return true;
+    // ⚠ centreActive MUST be compared here. Leave it out and the mark never
+    // brightens, because nothing else about the ring changes at the moment the
+    // sweep ends — the painter would be asked to repaint and correctly decline.
+    if (old.centreActive != centreActive) return true;
     for (int i = 0; i < lit.length; i++) {
       if (old.lit[i] != lit[i]) return true;
     }

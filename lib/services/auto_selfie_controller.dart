@@ -244,6 +244,43 @@ class AutoSelfieController {
     await start();
   }
 
+  /// Fire the shutter now, without waiting for this controller's own framing
+  /// gate to agree.
+  ///
+  /// ── ⚠ WHY THIS EXISTS: TWO GATES MEASURING THE SAME THING ────────────────
+  ///
+  /// Added 25 August 2026. Reported as "once the face is in centre it detects
+  /// and trigger selfie automatically — at this moment it is manual".
+  ///
+  /// The liveness ring finishes by PROVING the face is centred and has been
+  /// held there. Then it released the shutter and this controller started
+  /// counting from scratch: three consecutive frames passing its own
+  /// thresholds, then a hold-still pause. Two separate gates asking the same
+  /// question with different numbers — and if this one's bar
+  /// (_liveMinOverall, and a face-size check measuring against the whole
+  /// frame) was not met, the shutter never fired at all and the person was
+  /// left pressing the button.
+  ///
+  /// That is the exact failure family this project keeps paying for: one fact,
+  /// two places, only one of them maintained. The ring already knows the
+  /// answer. It should be allowed to say so.
+  ///
+  /// ⚠ THE GUIDANCE AND THE CHECKS ARE NOT SKIPPED. The photograph is still
+  /// judged by the full accurate-mode inspector in onCaptured, and still
+  /// rejected there if it is genuinely unusable. What is skipped is asking the
+  /// same question twice.
+  Future<void> captureNow() async {
+    if (_stopped) return;
+    if (state.value == AutoSelfieState.capturing ||
+        state.value == AutoSelfieState.captured) {
+      return;
+    }
+    _goodFrames = 0;
+    _cancelHold();
+    holdShutter = false;
+    await _capture();
+  }
+
   Future<void> stop() async {
     _holdTimer?.cancel();
     _holdTimer = null;

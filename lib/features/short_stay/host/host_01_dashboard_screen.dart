@@ -702,6 +702,15 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
           HostRoutes.messaging),
       _QuickAction('Payout details', Icons.account_balance_outlined,
           HostRoutes.payoutDetails),
+      // ── ⚠ THE ONLY WAY TO SEE A CLAIM ONCE IT HAS BEEN MADE. ──────────────
+      //
+      // Added 25 August 2026. host_18 has existed since 4 August with a route
+      // registered and NOTHING NAVIGATING TO IT — so even after the claims flow
+      // was built, a host who opened one could never look at it again.
+      //
+      // Reporting damage starts from the booking; this is where it is followed.
+      _QuickAction('Damage claims', Icons.report_gmailerrorred_outlined,
+          HostRoutes.claimStatus),
       _QuickAction('Help centre', Icons.help_outline_rounded, HostRoutes.help),
     ];
 

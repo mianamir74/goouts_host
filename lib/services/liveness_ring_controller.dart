@@ -93,7 +93,28 @@ enum LivenessRingState {
   /// Face found and centred. Turning fills the ring.
   sweeping,
 
-  /// Enough of the ring is lit. Take the photograph.
+  /// Both sides are done. Now come back to the middle and look straight ahead.
+  ///
+  /// ── ⚠ WHY THIS STATE EXISTS, ADDED 24 August 2026 ────────────────────────
+  ///
+  /// Reported from a real device: "it took selfie where my face is either on
+  /// left or right ... rather then when i bring back centre".
+  ///
+  /// The sweep used to end the moment the ring closed, which is the moment the
+  /// head is at one EXTREME — and the shutter was released right there. So the
+  /// identity photograph was a three-quarter profile, taken at the exact
+  /// instant the person was furthest from facing the camera.
+  ///
+  /// That is not a cosmetic complaint. The photograph exists to be compared
+  /// against a passport, and a passport photograph is straight on. A profile
+  /// matches nothing.
+  ///
+  /// So the ring closing no longer means "take it". It means "stop turning and
+  /// come back", and the shutter stays held until the head is genuinely
+  /// centred. The clock keeps running, so nobody is trapped here either.
+  returnToCentre,
+
+  /// Ring closed AND the head is back in the middle. Take the photograph.
   complete,
 
   /// Ran out of time. The screen should capture anyway — see the header.
@@ -294,13 +315,60 @@ class LivenessRingController {
       return;
     }
 
+    // ── THE SWEEP IS DONE. NOW COME BACK TO THE MIDDLE. ───────────────────
+    //
+    // The shutter is still held by the screen at this point, so nothing can be
+    // photographed until this passes. The twelve-second clock is still
+    // running, so if somebody stops here the timeout releases them anyway with
+    // the photograph taken — the app assists, it does not trap.
+    if (state.value == LivenessRingState.returnToCentre) {
+      if (yaw.abs() > centreTolerance) {
+        _steadySince = null;
+        hint.value = 'Now look straight at the camera';
+        return;
+      }
+      // Held straight for a moment, not merely passing through the middle on
+      // the way somewhere else. Without this the shutter fires as the head
+      // sweeps back past centre at speed, which is the blurred photograph the
+      // whole hold-still pause exists to prevent.
+      _steadySince ??= DateTime.now();
+      if (DateTime.now().difference(_steadySince!).inMilliseconds < steadyMs) {
+        hint.value = 'Hold still';
+        return;
+      }
+      _finish(LivenessRingState.complete);
+      hint.value = 'Hold still';
+      return;
+    }
+
     _light(yaw);
   }
 
   /// -sweep..+sweep mapped onto 0..segments-1.
+  ///
+  /// ── ⚠ THE DIRECTION IS INVERTED, AND THAT IS THE FIX, NOT THE BUG ─────────
+  ///
+  /// Reported from a real device on 24 August 2026: "green circle line turn
+  /// green opposite side as soon as i turn my face to left to right".
+  ///
+  /// ML Kit reports yaw against the SENSOR image. The preview the person is
+  /// looking at is MIRRORED, the way a bathroom mirror is, so that moving right
+  /// moves your reflection right. Those two disagree by definition, and the
+  /// ring was painting the sensor's opinion onto a mirrored picture — so the
+  /// arc lit on the far side from the head that was moving.
+  ///
+  /// It was not subtly wrong. Turning left lit the right. There is no way to
+  /// work out which way round it should be from Google's documentation alone,
+  /// because the answer depends on the mirroring, and the only reliable
+  /// instrument is a person holding a real phone.
+  ///
+  /// ⚠ THE ARROWS AND THE HINTS FOLLOW THIS AUTOMATICALLY. LivenessArrows is
+  /// fed the lit list rather than the angle, and leftDone/rightDone are read
+  /// from the same list — which is exactly why this is a ONE LINE correction
+  /// and not three separate ones that could disagree with each other.
   int _indexFor(double yaw) {
     final double clamped = yaw.clamp(-sweepDegrees, sweepDegrees);
-    final double t = (clamped + sweepDegrees) / (2 * sweepDegrees);
+    final double t = (sweepDegrees - clamped) / (2 * sweepDegrees);
     return (t * (segments - 1)).round().clamp(0, segments - 1);
   }
 
@@ -386,8 +454,23 @@ class LivenessRingController {
         // is full, so it never delays anybody — it only refuses a ring that
         // was filled from too few readings to be a head turning.
         _framesWithFace >= minSweepFrames) {
-      _finish(LivenessRingState.complete);
-      hint.value = 'Hold still';
+      // ⚠ NOT _finish. The turning part is over; the photograph is not taken
+      // yet. See LivenessRingState.returnToCentre — the head is at an extreme
+      // at this exact moment, and a shutter released here produces a profile
+      // shot that matches no passport.
+      //
+      // The ring is FILLED COMPLETELY here rather than left at 85%. The person
+      // has done the movement, and leaving four dark segments they can no
+      // longer fill reads as "not quite good enough" at the moment they
+      // succeeded.
+      lit.value = List<bool>.filled(segments, true);
+      progress.value = 1.0;
+      _steadySince = null;
+      state.value = LivenessRingState.returnToCentre;
+      // Names the TARGET, not the feeling. "Look straight at the camera"
+      // describes how it should feel; "the middle of the circle" is somewhere
+      // they can actually aim, and there is a mark there now to aim at.
+      hint.value = 'Bring your face back to the middle of the circle';
     }
   }
 
